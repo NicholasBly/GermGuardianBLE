@@ -1,0 +1,304 @@
+<div id="register-panel" class="s1">
+  <div class="content">
+    <div class="close-button">
+      <span class="icon-cross"></span>
+    </div>
+    <div class="entrance-view">
+      <span>Connect to Air Purifier</span><br>
+      <div class="image">
+        <img src="./img/rf1-00.png">
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row trans">
+          <span class="text center bold">Press and hold the "LINK" button until green light starts blinking.</span>
+        </div>
+        <div class="row trans">
+          <span class="text center middle-text">App automatically advances to the next screen when it finds the air purifier.</span>
+        </div>
+        <div class="row trans">
+          <p class="balloon">
+            <span class="icon-help"></span>&nbsp;<span>Nothing appears on the screen?</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="screen progress">
+    <div class="balloon-dialog">
+      <div class="bar"></div>
+      <span class="step"></span>
+      <p class="desc"></p>
+    </div>
+    <div class="balloon-dialog">
+      <p>Multiple connection signals are detected. Only one device can connect at a time.
+         Unplug other smart Guardian products and try connecting again.
+      </p>
+      <div class="cancel-button">Cancel</div>
+    </div>
+  </div>
+  <div class="screen">
+    <div class="balloon-dialog">
+      <div class="row">
+        <span class="icon-cross"></span>
+      </div>
+      <div class="l-grid-wrapper">
+        <div class="row">
+          <span class="label bold center">Please check the below</span>
+        </div>
+        <div class="row">
+          <span class="icon plug"></span>
+          <p class="text">
+            <span>Is your air purifier plugged in?</span><br>
+            <span class="middle-text">It does not matter if your device is on or off for the App to successfully connect.</span>
+          </p>
+        </div>
+        <div class="row">
+          <span class="icon bluetooth"></span>
+          <p class="text">
+            <span>Is the Bluetooth&reg; ON?</span><br>
+            <span class="middle-text">Bluetooth needs to be turned "ON" in your device settings.</span>
+          </p>
+        </div>
+        <div class="row">
+          <span class="icon simultaneous"></span>
+          <p class="text">
+            <span>Trying to connect multiple devices simultaneously? </span><br>
+            <span class="middle-text">Connect only one device at a time.</span>
+          </p>
+        </div>
+        <div class="row">
+          <p class="text"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  'use strict';
+
+(function($) {
+
+  // @const
+  var SEARCH_INTERVAL = 1000; //ms
+  var RELEVANCE_LIMIT = 5;
+
+  var relevanceCount;
+  var $progress;
+
+  // 対象デバイス(ペア)の検索を繰り返す
+  var searchStart = (function() {
+    var timerId;
+    var startTime = new Date().getTime();
+    relevanceCount = 0;
+    return function() {
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+      timerId = setTimeout(function() {
+        searchTargetDevices(startTime, function(success) {
+          if (success) {
+            var $queries = [];
+            // この時点でBwGatewayは接続状態にしておく
+            $queries.push($.Deferred(function($dfd) {
+              retainConnection(_targetBwGateway, function(success) {
+                log('[BWG] retainConnection() ' + (success ? 'success' : 'failed') + '.');
+                if (success) {
+                  $dfd.resolve();
+                } else {
+                  $dfd.reject();
+                }
+              });
+            }));
+            if (isRegistrationMode()) {
+              // 登録する機器の前処理
+              $queries.push($.Deferred(function($dfd) {
+                preparePurifier(_targetPurifier, function(success) {
+                  console.debug('preparePurifier() ' + (success ? 'success' : 'failed') + '.');
+                  if (success) {
+                    $dfd.resolve();
+                  } else {
+                    $dfd.reject();
+                  }
+                });
+              }));
+            }
+            $.when.apply($, $queries)
+            .done(function() {
+              Activity.removeEventListener('onPause', pauseHandler);
+              if (isRegistrationMode()) {
+                routes.register.input('left');
+              } else {
+                routes.register.wifi('true');
+              }
+            })
+            .fail(function() {
+              if (_targetBwGateway.inCommunication()) {
+                _targetBwGateway.stopCommunication();
+              }
+              searchStart();
+            });
+          } else {
+            // やり直し
+            searchStart();
+          }
+        });
+      }, SEARCH_INTERVAL);
+    }
+  })();
+
+  $(function() {
+    $('.close-button, .cancel-button').pressable().click(function() {
+      Activity.removeEventListener('onPause', pauseHandler);
+      closeHandler.apply(this, arguments);
+    });
+    $('.footer .balloon')
+    .on('touchstart', function() {
+      $(this).addClass('pressed');
+    })
+    .on('touchend touchcancel', function() {
+      $(this).removeClass('pressed');
+    })
+    .on('click', function() {
+      $('.screen').addClass('fade-in');
+    });
+    var $screen = $('.screen');
+    $('.icon-cross', $screen).click(function() {
+      $screen.addClass('fade-out').removeClass('fade-in');
+      setTimeout(function() {
+        $screen.removeClass('fade-out');
+      }, 1000);
+    });
+    $progress = $('.screen.progress');
+
+    // 新規登録モード時(パラメータ無し)のみページの自動更新を有効にする
+    if (isRegistrationMode()) {
+      Activity.addEventListener('onPause', pauseHandler);
+    }
+
+    /* ビーコン検索して登録対象デバイスのペアを見つける */
+    searchStart();
+  });
+
+  function searchTargetDevices(startTime, callback) {
+    _guardian.findRegisterableDevices(startTime,
+      // success
+      function(devices) {
+        var purifiers = [], bwgateways = [];
+        // PurifierとBwGateway両方が1つずつ含まれていることが条件
+        devices.forEach(function(device) {
+          if (device instanceof Purifier) {
+            purifiers.push(device);
+          } else
+          if (device instanceof BwGateway) {
+            bwgateways.push(device);
+          } else {
+            _guardian.log('unknown device object:', device);
+          }
+        });
+        if (purifiers.length == 1 && bwgateways.length == 1) {
+          // JM1の組み合わせが変わっていたらカウントリセット
+          if ((!_targetPurifier  || _targetPurifier.getUniqueId()  != purifiers[0].getUniqueId()) ||
+              (!_targetBwGateway || _targetBwGateway.getUniqueId() != bwgateways[0].getUniqueId())) {
+            relevanceCount = 0;
+          }
+          if (RELEVANCE_LIMIT <= ++relevanceCount) {
+            progressState('2');
+            doCallback(callback, true);
+          } else {
+            progressState('1');
+            // WiFi設定変更のみの場合、機器側のJM1は指定されたものから変動させない
+            if (isRegistrationMode()) {
+              _targetPurifier  = purifiers[0];
+            }
+            _targetBwGateway = bwgateways[0];
+            doCallback(callback, false);
+          }
+        } else {
+          relevanceCount = 0;
+          _guardian.log('purifiers:', purifiers);
+          _guardian.log('bwgateways:', bwgateways);
+
+          // 複数台見つかる場合は注意喚起
+          if (1 < purifiers.length || 1 < bwgateways.length) {
+            progressState('e');
+          } else {
+            progressState();
+          }
+
+          doCallback(callback, false);
+        }
+        _guardian.log('Relevance count:' + relevanceCount);
+      },
+      // error
+      function() {
+        doCallback(callback, false);
+      }
+    );
+  }
+
+  /**
+   * 空気清浄機側のJM1は登録開始ビーコンの送出を開始してから60秒しか
+   * 登録モードが使用できないため、検出タイミングで即座にLocalKey発行まで済ませておく
+   */
+  function preparePurifier(device, callback) {
+    if (!(device instanceof Purifier)) {
+      doCallback(callback, false);
+      return;
+    }
+    console.debug('preparePurifier start');
+    var cleanup = function(complete) {
+      if (device.inCommunication()) {
+        device.stopCommunication(complete, complete);
+      } else {
+        doCallback(complete);
+      }
+    };
+    device.startCommunication(function() {
+      device.registerDeviceLocal(function() {
+        cleanup(function() {
+          doCallback(callback, true);
+        });
+      },
+      function(err) {
+        cleanup(function() {
+          doCallback(callback, false);
+        });
+      });
+    }, function(err) {
+      doCallback(callback, false);
+    });
+  }
+
+  /**
+   * @param state 1 or 2 or e
+   */
+  function progressState(state) {
+    switch (state) {
+    case '1':
+    case '2':
+    case 'e':
+      $progress.attr('data-step', state).removeClass('fade-out').addClass('fade-in');
+      break;
+    default:
+      if ($progress.hasClass('fade-in')) {
+        $progress.removeClass('fade-in').addClass('fade-out');
+        setTimeout(function() {
+          $progress.removeClass('fade-out').removeAttr('data-step');
+        }, 1000);
+      }
+      break;
+    }
+  }
+
+  function pauseHandler() {
+    setTimeout(function() {
+      Activity.swapAvailableCache(true);
+    }, 0);
+  }
+
+})(jQuery);
+</script>

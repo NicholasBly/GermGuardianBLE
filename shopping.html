@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Guardian</title>
+  <link rel="stylesheet" href="./css/icomoon.css">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+<div id="content">
+  <div class="wrapper">
+    <div id="shopping-panel">
+      <div class="header">
+        <div class="close-button">
+          <span class="icon-cross"></span>
+        </div>
+        <p class="title">
+          Shop<br>Replacement Parts
+        </p>
+      </div>
+      <div class="content">
+        <p class="title">
+          Please select your product<br>
+          to be directed to replacement parts store.
+        </p>
+        <div id="CDAP4500BCA" class="row product">
+          <img src="./img/rp-cdap4500.png">
+          <div class="text">CDAP4500BCA</div>
+          <span class="arrow icon-next"></span>
+        </div>
+        <div id="CDAP5500BCA" class="row product">
+          <img src="./img/rp-cdap5500.png">
+          <div class="text">CDAP5500BCA</div>
+          <span class="arrow icon-next"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+<script src="./js/jquery-2.1.4.min.js"></script>
+<script src="./js/hubea-r8533.js"></script>
+<script src="./js/activity.js"></script>
+<!--
+<script src="./js/private/hubea_stub.js"></script>
+<script src="./js/private/hmac-sha256.js"></script>
+<script src="./js/private/enc-base64-min.js"></script>
+-->
+<script type="text/javascript">
+  'use strict';
+
+  if (typeof setHubeaStub !== 'undefined') {
+    setHubeaStub();
+    $.ajaxSetup({
+      cache: false
+    });
+  }
+
+  $(function() {
+    hubea.ready(initialize);
+  });
+
+  function initialize() {
+    $('.row.product').pressable().click(productHandler);
+    $('.close-button').pressable().click(closeHandler);
+  }
+
+  function productHandler(event) {
+    var id = $(this).attr('id');
+    var url;
+    log('productHandler:%s', id);
+    if (id == 'CDAP5500BCA') {
+        url = 'https://www.guardiantechnologies.com/accessories-bulbs-filters/accessories-bulbs-filters-flt5000-filter-c-pet-true-hepa-pet-pure-replacement-filter.html?' +
+              'utm_source=cdap5500app&utm_campaign=cdap5500appreminder&utm_medium=banner&utm_content=appreplacereminder';
+    } else {
+        url = 'https://www.guardiantechnologies.com/accessories-bulbs-filters/accessories-bulbs-filters-flt4825-filter-b-true-hepa-replacement-filter.html?' +
+              'utm_source=cdap4500app&utm_campaign=cdap4500appreminder&utm_medium=banner&utm_content=appreplacereminder';
+    }
+    Activity.launchApp(url);
+  }
+
+  function closeHandler(event) {
+    log('closeHandler');
+    Activity.closeSelf();
+  }
+
+  function log(message) {
+    console.log('[LOG]', message);
+  }
+
+</script>
+</html>

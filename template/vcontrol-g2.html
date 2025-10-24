@@ -1,0 +1,118 @@
+<div id="vcontrol-panel" class="s2">
+  <div class="header">
+    <div class="back-button">
+      <span class="icon-prev"></span>
+    </div>
+    <div class="title">
+      <span>How to setup voice control</span>
+    </div>
+    <div class="tabs">
+      <div class="tab">
+        <input id="tab-google-home" type="radio" name="device-type" checked>
+        <label for="tab-google-home">Google Home</label>
+      </div>
+      <div class="tab">
+        <input id="tab-android" type="radio" name="device-type">
+        <label for="tab-android">Android</label>
+      </div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+      <p class="text">
+        <span class="hilight">Requirement</span><br>
+        <span class="for-google-home">To use the voice control, please prepare the below in advance.</span>
+        <span class="for-android">Android device</span>
+      </p>
+    </div>
+    <div class="row for-google-home">
+      <p class="balloon">
+        <span class="bold">Google Home</span><br>
+        <span id="google-home-button" class="anchor">&raquo;For more details</span>
+      </p>
+    </div>
+    <div class="row for-google-home">
+      <p class="balloon">
+        <span class="bold">App "Google Home"</span><br>
+        <span>You can download by App Store or Google Play Store. Please login with your Google account.</span>
+      </p>
+    </div>
+    <div class="row">
+      <p class="text">
+        <span class="hilight">Please check your device settings</span><br>
+        <span>Wi-Fi setting is required. You can check the status of Wi-Fi setting in the Device Settings screen.</span>
+      </p>
+    </div>
+    <div class="row">
+      <p class="balloon">
+        <img src="./img/ht-vc01.jpg">
+      </p>
+    </div>
+    <div class="row">
+      <p class="text">
+        <span class="hilight">1, Log in with Guardian TE account</span><br>
+        <span>If you have already logged in, skip this step.</span>
+      </p>
+    </div>
+    <div class="row">
+      <p class="balloon">
+        <img src="./img/ht-vc02.jpg">
+      </p>
+    </div>
+    <div class="row for-google-home">
+      <p class="text">
+        <span class="hilight">2, Account link with Google Home</span><br>
+        <span>Open the "Discover" screen of Google Home app, and say "OK Google, talk to Guardian Technologies" to your Google Home device. Then you can proceed setup follow the instruction.</span>
+      </p>
+    </div>
+    <div class="row for-android">
+      <p class="text">
+        <span class="hilight">2, Account link with Google Assistant</span><br>
+        <span>Say "OK Google, talk to Guardian Technologies" to your Android. Then you can proceed setup follow the instruction.</span>
+      </p>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  'use strict';
+
+(function($) {
+  var _$panel;
+
+  $(function() {
+    _$panel = $('#vcontrol-panel.s2');
+
+    $('input[name="device-type"]:radio').change(tabHandler);
+    $('input[name="device-type"]:checked').trigger('change');
+
+    $('#google-home-button', _$panel).click(googleHomeHandler);
+    $('.back-button', _$panel).click(backHandler);
+  });
+
+  function tabHandler() {
+    var $tab = $(this);
+    console.log('tabHandler: val:%s id:%s', $tab.val(), $tab.attr('id'));
+    switch($tab.attr('id')) {
+    case 'tab-google-home':
+      $('.for-android', _$panel).hide();
+      $('.for-google-home', _$panel).show();
+      break;
+    case 'tab-android':
+      $('.for-google-home', _$panel).hide();
+      $('.for-android', _$panel).show();
+      break;
+    }
+  }
+
+  function googleHomeHandler() {
+    log('googleHomeHandler');
+    Activity.launchApp('https://store.google.com/product/google_home?gclid=EAIaIQobChMI49_4vtTK2AIVGwYqCh1OFQ3nEAAYASAAEgIIZvD_BwE&dclid=CKaurcDUytgCFQlTvQodsycPVA');
+  }
+
+  function backHandler() {
+    log('backHandler');
+    routes.vcontrol.google_top('right');
+  }
+
+})(jQuery);
+</script>

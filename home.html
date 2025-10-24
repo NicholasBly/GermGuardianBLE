@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>home</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+</head>
+<body>
+<script src="./js/hubea-r8533.js"></script>
+<script type="text/javascript">
+    'use strict';
+
+    // 即時起動する
+    try {
+      hubea.system.activity.start(
+        {
+          url: 'https://guardian.hubea.com/air/contents/product/index.html',
+          scenarioId: 482
+        },
+        null, null);
+    } catch (e) {
+      console.error(e);
+    }
+</script>
+</body>
+</html>

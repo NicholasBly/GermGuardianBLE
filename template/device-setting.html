@@ -1,0 +1,317 @@
+<div id="device-setting-panel">
+  <div class="header">
+    <div class="back-button">
+      <span class="icon-prev"></span>
+    </div>
+    <div class="title">
+      <span>Device Setting</span>
+    </div>
+  </div>
+  <div class="content">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row title">
+          <span>Air Purifier</span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row">
+          <span class="label">Device name</span>
+          <input id="device-name-input" type="text"/>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row device-icon-button">
+          <span class="label">Select Device icon</span>
+          <span class="device-icon"></span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row ap-setting-button">
+          <div class="label wifi-setting">
+            <span>Wi-Fi setting</span>
+          </div>
+          <span id="ap-setting" class="icon-next"></span>
+        </div>
+      </div>
+      <!-- Connection Mode選択は削除予定 -->
+      <section id="connection-mode" class="hidden">
+      <div class="l-grid10">
+        <div class="row title">
+          <span>Connection mode</span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row">
+          <input name="mode-radio" type="radio" value="wifi+ble" id="mode-radio-auto">
+          <label for="mode-radio-auto">Wi-Fi + BLE</label>
+        </div>
+        <div class="row">
+          <input name="mode-radio" type="radio" value="wifi" id="mode-radio-wifi">
+          <label for="mode-radio-wifi">Wi-Fi</label>
+        </div>
+        <div class="row">
+          <input name="mode-radio" type="radio" value="ble" id="mode-radio-bt">
+          <label for="mode-radio-bt">BLE</label>
+        </div>
+      </div>
+      </section>
+      <div class="l-grid10">
+        <div class="row title">
+          <span>App</span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row deregister-button">
+          <span class="icon deregister"></span>
+          <span id="deregister" class="text alert">Forget this air purifier from the app</span>
+          <span class="icon-next"></span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row title">
+          <p class="text">
+            <span>Reset</span><br>
+            <span class="middle-text">&lowast;In order to reset, you need the air purifier within reach and plugged in.</span>
+          </p>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row resetter-button">
+          <span class="icon reset"></span>
+          <p class="text">
+            <span id="resetter" class="label alert">Factory Reset</span><br>
+            <span class="middle-text">・Saved settings will be erased from all smartphones formerly connected.</span><br>
+            <span class="middle-text">・Saved Wi-Fi access point will be erased from the air purifier.</span>
+          </p>
+          <span class="icon-next"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  'use strict';
+
+  var _editIcon; // icon-pickerで参照する
+
+(function($) {
+  var _$deviceSettingPanel;
+  var _currentPurifierName;
+  var _currentIcon;
+
+  $(function() {
+    initialize();
+  });
+
+  function initialize() {
+    _$deviceSettingPanel = $('#device-setting-panel');
+    if (_targetPurifier) {
+      // Device Name
+      _currentPurifierName = _targetPurifier.getDeviceName();
+      $('#device-name-input').val(_currentPurifierName).change(deviceNameChangedHandler);
+      if (_targetPurifier.getWifiAccessible()) {
+        $('.wifi-setting', _$deviceSettingPanel).addClass('checked');
+      } else {
+        $('.wifi-setting', _$deviceSettingPanel).removeClass('checked');
+      }
+      // Device Icon
+      _currentIcon = _targetPurifier.getDeviceIcon() || {};
+      $('.device-icon', _$deviceSettingPanel).attr({
+        'data-type' : _currentIcon.type,
+        'data-color': _currentIcon.color
+      });
+      $('.device-icon-button', _$deviceSettingPanel).click(iconHandler);
+
+      // Wi-Fi Setting ボタン
+      $('.ap-setting-button', _$deviceSettingPanel).click(wifiSettingHandler);
+      // Deregister ボタン
+      $('.deregister-button', _$deviceSettingPanel).click(deregisterHandler);
+      // Resetter ボタン
+      $('.resetter-button', _$deviceSettingPanel).click(resetterHandler);
+    }
+    // BACK ボタン
+    $('.back-button', _$deviceSettingPanel).click(backHandler);
+  }
+
+  function backHandler(event) {
+    log('backHandler');
+    routes.device.control('right');
+  }
+
+  function iconHandler(event) {
+    _editIcon = null;
+    routes.device.icon(true, null, function() {
+      overlayMonitorTimerStart(function(visible) {
+        if (!visible || !_editIcon) {
+          return;
+        }
+        console.debug('_editIcon:', _editIcon);
+        if (_currentIcon.type == _editIcon.type && _currentIcon.color == _editIcon.color) {
+          return;
+        }
+        _targetPurifier.editStart()
+          .editDeviceIcon(_editIcon)
+          .updateDevice(function() {
+            _currentIcon = _editIcon;
+            $('.device-icon', _$deviceSettingPanel).attr({
+              'data-type' : _currentIcon.type,
+              'data-color': _currentIcon.color
+            });
+          },
+          function(err) {
+            Activity.showDialog({title: 'ERROR', message: 'Failed to update icon.'});
+          });
+      });
+    });
+  }
+
+  function wifiSettingHandler(event) {
+    log('wifiSettingHandler');
+    var settingUrl = hubea.util.absolutePath('./register.html');
+    if (_targetPurifier) {
+      settingUrl += '?uniqueid=' + _targetPurifier.getUniqueId();
+    }
+    if (Activity.launchActivity(settingUrl)) {
+      setPostWifiSetting();
+    }
+  }
+
+  function modeHandler(event) {
+    var mode = $(this).val();
+    log('modeHandler selected val=' + mode);
+  }
+
+  function deviceNameChangedHandler(event) {
+    var $input = $(this);
+    var enteredName = $input.val();
+    if (!validateDeviceName(enteredName)) {
+      return;
+    }
+    if (!_targetPurifier || enteredName == _currentPurifierName) {
+      return;
+    }
+    _targetPurifier.editStart()
+      .editDeviceName(enteredName)
+      .updateDevice(function() {
+        _currentPurifierName = enteredName;
+      },
+      function(err) {
+        $input.val(_currentPurifierName);
+        Activity.showDialog({title: 'ERROR', message: 'Failed to update name.'});
+      });
+  }
+
+  function deregisterHandler(event) {
+    // 登録解除 & コンテンツ画面終了
+    if (_targetPurifier) {
+      dialogConfirm({
+        deviceName: _targetPurifier.getDeviceName(),
+        note: 'Are you sure you want to deregister this air purifier?',
+        ok: 'OK',
+        cancel: 'Cancel'
+      }, function() {
+        loading(true);
+        _targetPurifier.unregisterDevice(
+          function() {
+            loading(false);
+            // 登録機器の有無に関わらず[G1]ダッシュボードへ
+            routes.dashboard.top('right');
+          },
+          function(err) {
+            loading(false);
+            Activity.showDialog({title: 'ERROR', message: 'Please check network and try again.'});
+          }
+        );
+      }, function() {
+        log('Deregistration is cancelled.');
+      });
+    }
+  }
+
+  function resetterHandler() {
+    log('resetterHandler');
+    var resetterUrl = hubea.util.absolutePath('./register.html');
+    if (_targetPurifier) {
+      resetterUrl += '?reset=true&uniqueid=' + _targetPurifier.getUniqueId();
+    }
+    if (Activity.launchActivity(resetterUrl)) {
+      setPostReset();
+    }
+  }
+
+  //WiFi設定画面から復帰した時の自動アクション
+  function setPostWifiSetting() {
+    try {
+      Activity.addEventListener('onResume', function onResume() {
+        log('onResume event.');
+        if (!_targetPurifier) {
+          return;
+        }
+        // WiFi設定状態
+        _guardian.refreshCache(function() {
+          console.log('refreshCache complete');
+          getRegisteredDevice(_targetPurifier.getUniqueId(), function(device) {
+            if (device) {
+              _targetPurifier = device;
+            }
+            if (_targetPurifier.getWifiAccessible()) {
+              $('.wifi-setting', _$deviceSettingPanel).addClass('checked');
+            } else {
+              $('.wifi-setting', _$deviceSettingPanel).removeClass('checked');
+            }
+          });
+        });
+      }, true);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  //Reset画面から復帰した時の自動アクション
+  function setPostReset() {
+    try {
+      Activity.addEventListener('onResume', function onResume() {
+        log('onResume event.');
+        if (!_targetPurifier) {
+          return;
+        }
+        // 状態更新
+        _guardian.refreshCache(function() {
+          console.log('refreshCache complete');
+          getRegisteredDevices(function(devices) {
+            devices = devices.filter(function(device) {
+              return (device instanceof Purifier);
+            });
+            if (devices.some(function(device) {
+              return (device.getUniqueId() == _targetPurifier.getUniqueId());
+            })) {
+              // リセット失敗
+              return;
+            }
+            // 登録機器の有無に関わらず[G1]ダッシュボードへ
+            routes.dashboard.top('right');
+          });
+        });
+      }, true);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function validateDeviceName(val) {
+    // check empty or blank
+    if (!val || !val.trim()) {
+      Activity.showDialog({title: 'Confirmation', message: 'Please input a valid name.'});
+      return false;
+    }
+    if (64 < val.length) {
+      Activity.showDialog({title: 'Confirmation', message: 'Device name is too long.'});
+      return false;
+    }
+    return true;
+  }
+
+})(jQuery);
+</script>
+</html>

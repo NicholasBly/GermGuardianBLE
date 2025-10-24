@@ -1,0 +1,143 @@
+<div id="register-panel" class="s2">
+  <div class="header">
+    <div class="close-button">
+      <span class="icon-cross"></span>
+    </div>
+    <div class="title">
+        <span>Connect</span>
+    </div>
+  </div>
+  <div class="content">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row title">
+          <span>Connect your air purifier to the app</span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row">
+          <span class="label">Device name</span>
+          <input id="device-name-input" type="text" placeholder="e.g., Living room"/>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div id="device-icon-button" class="row">
+          <span class="label">Select Device icon</span>
+          <span class="device-icon"></span>
+        </div>
+      </div>
+      <div class="l-grid10">
+        <div class="row trans">
+          <div id="next-button" class="label l-button">
+            <span>Next</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  'use strict';
+
+  var _editIcon; // icon-pickerで参照する
+
+(function($) {
+
+  var _$registerPanel;
+
+  $(function() {
+    initialize();
+  });
+
+  function initialize() {
+     _$registerPanel = $('#register-panel.s2');
+
+    if (!_targetPurifier) {
+      console.warn('no target purifier');
+    } else {
+      // Device Name
+      var deviceName = _targetPurifier.getDeviceName() || _targetPurifier.getProductName();
+      if (deviceName) {
+        $('#device-name-input', _$registerPanel).val(deviceName);
+      }
+      // Device Icon
+      $('#device-icon-button', _$registerPanel).click(iconHandler);
+
+      $('#next-button', _$registerPanel).on('touchstart', function() {
+        $(this).addClass('pressed');
+      }).on('touchend touchcancel', function() {
+        $(this).removeClass('pressed');
+      }).click(registerHandler);
+    }
+    $('.close-button', _$registerPanel).click(closeHandler);
+
+    if (!_targetBwGateway) {
+      console.warn('no target bwgateway');
+    }
+  }
+
+  function iconHandler(event) {
+    _editIcon = null;
+    routes.device.icon(true, null, function() {
+      overlayMonitorTimerStart(function(visible) {
+        if (!visible || !_editIcon) {
+          return;
+        }
+        $('.device-icon', _$registerPanel).attr({
+          'data-type' : _editIcon.type,
+          'data-color': _editIcon.color
+        });
+      });
+    });
+  }
+
+  function registerHandler(event) {
+    log('registerHandler');
+    // input check
+    var enteredName = $('#device-name-input').val();
+    if (!validateDeviceName(enteredName)) {
+      return;
+    }
+    _targetPurifier.editStart().editDeviceName(enteredName);
+    if (_editIcon) {
+      _targetPurifier.editDeviceIcon(_editIcon);
+    }
+    deviceRegistration(function(success) {
+      if (success) {
+        // 遷移前にWiFi設定編集情報をクリアしておく
+        _editSsid = null;
+        _editPass = null;
+        _editPin  = null;
+        // 下の画面遷移はActivity起動ではなくdomを重ねるだけなのでinput要素がfocus獲得しないようにdisabledにする(#11031)
+        // 戻ってくる場合は復帰処理が必要だが今の所はない
+        $('input', _$registerPanel).prop('disabled', true);
+        // WiFi設定画面
+        routes.register.wifi(true, null, function() {
+          overlayMonitorTimerStart(function(visible) {
+            // この画面に戻った場合はActivity終了
+            if (visible) {
+              Activity.closeSelf({
+                registeredUniqueId: _targetPurifier.getUniqueId()
+              });
+            }
+          });
+        });
+      }
+    });
+  }
+
+  function validateDeviceName(val) {
+    // check empty or blank
+    if (!val || !val.trim()) {
+      Activity.showDialog({title: 'Confirmation', message: 'Please input a valid name.'});
+      return false;
+    }
+    if (64 < val.length) {
+      Activity.showDialog({title: 'Confirmation', message: 'Device name is too long.'});
+      return false;
+    }
+    return true;
+  }
+
+})(jQuery);
+</script>

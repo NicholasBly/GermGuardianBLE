@@ -1,0 +1,116 @@
+<div id="vcontrol-panel" class="s1">
+  <div class="header">
+    <div class="close-button">
+      <span class="icon-cross"></span>
+    </div>
+    <div class="title">
+      <span>Voice control</span>
+    </div>
+    <button class="setup-button">Setup</button>
+  </div>
+  <div class="content">
+    <div class="getstarted hidden">
+      <span class="icon-cross"></span>
+      <span class="bold">Get Started</span>
+      <p>You can control the devices that you connected to the Guardian TE app with Google Home or Android.</p>
+      <div class="setup-button l-button"><span>How to setup</span></div>
+    </div>
+    <div class="row">
+      <p class="text">
+        <span class="bold hilight">Voice commands</span><br>
+        <span>For &lt;DeviceName&gt;, please enter the name you gave to the device on this app.</span>
+      </p>
+    </div>
+    <div class="row toggle">
+      <span class="label">General Information</span>
+      <span class="icon-next"></span>
+    </div>
+    <ul class="command-list" style="display:none">
+      <li>OK Google, talk to Guardian Technologies.</li>
+    </ul>
+    <div class="row toggle">
+      <span class="label">Control device</span>
+      <span class="icon-next"></span>
+    </div>
+    <ul class="command-list" style="display:none">
+      <li>OK Google, talk to Guardian Technologies to turn on &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to turn off &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to set the fan speed of &lt;DeviceName&gt; to &lt;1-5 or auto&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to turn on the uv mode of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to turn off the uv mode of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to set the timer of &lt;DeviceName&gt; for &lt;1-8&gt; hours.</li>
+      <li>OK Google, talk to Guardian Technologies to turn off the timer of &lt;DeviceName&gt;.</li>
+    </ul>
+    <div class="row toggle">
+      <span class="label">Ask device status</span>
+      <span class="icon-next"></span>
+    </div>
+    <ul class="command-list" style="display:none">
+      <li>OK Google, talk to Guardian Technologies to let me know the fan speed of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the fan speed of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to let me know the uv mode of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the uv mode of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to let me know the timer of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the timer of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to let me know the air quality of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the air quality of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to let me know the particulate matter of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the particulate matter of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to let me know the filter life of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the filter life of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to let me know the UV life of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to tell me the UV life of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to give me a status report of &lt;DeviceName&gt;.</li>
+      <li>OK Google, talk to Guardian Technologies to give me a status update of &lt;DeviceName&gt;.</li>
+    </ul>
+  </div>
+</div>
+<script type="text/javascript">
+  'use strict';
+
+(function($) {
+
+  var VC_GETSTARTED_KEY = 'voice-control-google-getstarted'; // clickme操作履歴
+  var _$panel;
+
+  $(function() {
+    _$panel = $('#vcontrol-panel.s1');
+
+    showGetStarted();
+
+    $('.close-button', _$panel).click(closeHandler);
+    $('.setup-button', _$panel).click(setupHandler);
+    $('.getstarted .icon-cross', _$panel).click(closeGetStartedHandler);
+    $('.toggle', _$panel).click(toggleHandler);
+  });
+
+  function showGetStarted() {
+    Activity.load(VC_GETSTARTED_KEY, function(data) {
+      if (data && data.skip) {
+        return;
+      }
+      $('.getstarted', _$panel).removeClass('hidden');
+    });
+  }
+
+  function closeGetStartedHandler() {
+    $(this).parent().slideUp();
+    Activity.save(VC_GETSTARTED_KEY, {skip: true});
+  }
+
+  function setupHandler() {
+    routes.vcontrol.google_setup('left');
+  }
+
+  function toggleHandler() {
+    var $this = $(this);
+    $this.toggleClass('open');
+    if ($this.hasClass('open')) {
+      $this.next('ul').slideDown();
+    } else {
+      $this.next('ul').slideUp();
+    }
+  }
+
+})(jQuery);
+</script>

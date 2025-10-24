@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Guardian</title>
+  <link rel="stylesheet" href="./css/icomoon.css">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+<div id="content">
+  <div class="wrapper"></div>
+</div>
+<section id="overlay"></section>
+</body>
+<script src="./js/jquery-2.1.4.min.js"></script>
+<script src="./js/velocity.min.js"></script>
+<script src="./js/crypto-js/rollups/md5.js"></script>
+<script src="./js/crypto-js/components/enc-base64-min.js"></script>
+<script src="./js/i18next-1.10.1.min.js"></script>
+<script src="./js/hubea-r8533.js"></script>
+<script src="./js/aspe.js"></script>
+<script src="./js/guardian-opt.js"></script>
+<script src="./js/guardian.js"></script>
+<script src="./js/activity.js"></script>
+<script src="./js/routes.js"></script>
+<!--
+<script src="./js/private/hubea_stub.js"></script>
+<script src="./js/private/hmac-sha256.js"></script>
+<script src="./js/private/enc-base64-min.js"></script>
+-->
+<script type="text/javascript">
+  'use strict';
+
+  /**
+   * [このスクリーンでやること]
+   * 1. [新規登録]
+   *    単純に起動された場合は、登録可能なAir PurifierとBLE/WiFi Gatewayのペアを特定して登録処理を行う
+   *    登録結果としてペアのuniqueIdをresultとして呼び出し元Activityへ返却する
+   *
+   * 2. [WiFi設定変更]
+   *    登録済みBLE/WiFi GatewayのuniqueIdが指定されて起動された場合、アクセスポイント選択/入力画面を表示して
+   *    ユーザーが決定したssidとパスワードを設定した結果を呼び出し元Activityへ返却する
+   */
+
+  /****** TEST ******/
+  var _TEST_WITH_HUBEAJS_STUB_ = false;
+
+  if (_TEST_WITH_HUBEAJS_STUB_ && typeof setHubeaStub !== 'undefined') {
+      var host = window.location.hostname;
+      guardianOpt.hubeaServerUrl = 'http://'+ host +'/bcnapp';
+      guardianOpt.guardianServerUrl = 'https://' + host + '/guardian';
+      setHubeaStub();
+
+      $.ajaxSetup({
+        cache: false
+      });
+  }
+  /****** TEST ******/
+
+  var _guardian = new Guardian(guardianOpt);
+  var _overlayMonitorTimerId;    //オーバーレイ状態監視タイマ
+  var _targetPurifier;     // 登録対象のPurifierオブジェクト
+  var _targetBwGateway;    // 登録対象のBwGatewayオブジェクト
+  var _isRegistrationMode; // Purifier登録操作の場合のみtrue
+  var _isResetMode;        // Purifierリセット操作の場合のみtrue
+  var _editSsid;           // Wi-Fi設定画面で編集したssid
+  var _editPass;           // Wi-Fi設定画面で編集したパスワード
+  var _editPin;            // Wi-Fi Access Code
+  var _textRes;
+
+  $('document').ready(function() {
+    printScenarioId();
+    //Guardian初期化
+    _guardian.setup(initialize, function() {
+      Activity.fatalExit('Guardian setup failed.');
+    });
+  });
+
+  function initialize() {
+    initResources(function(res) {
+      _textRes = res;
+
+      Activity.getParams(function(params) {
+        var purifierUniqueId;
+        var resetMode = false;
+        params = params || {};
+        if (params.queryParams) {
+          purifierUniqueId = params.queryParams.uniqueid;
+          resetMode = (params.queryParams.reset == 'true');
+        }
+        _guardian.getRegisteredDevices(function(devices) {
+          devices = devices.filter(function(device) {
+            return (device instanceof Purifier);
+          });
+          if (!purifierUniqueId) {
+            // LINKボタン押下要求(新規登録)
+            _isRegistrationMode = true;
+            routes.register.top();
+            return;
+          }
+          for (var i = 0; i< devices.length; i++) {
+            if (devices[i].getUniqueId() === purifierUniqueId) {
+              _targetPurifier = devices[i];
+              if (resetMode) {
+                // LINKボタン押下要求(機器リセット)
+                _isResetMode = true;
+                routes.register.reset();
+              } else {
+                // LINKボタン押下要求(WiFi設定)
+                routes.register.top();
+              }
+              return;
+            }
+          }
+          Activity.fatalExit('Selected Purifier[' + purifierUniqueId + '] is not registered.');
+        },
+        function(err) {
+          Activity.fatalExit('Registration process error[getRegisteredDevices].');
+        });
+      });
+    });
+  }
+
+  function isRegistrationMode() {
+    return (_isRegistrationMode == true);
+  }
+
+  function isResetMode() {
+    return (_isResetMode == true);
+  }
+
+  function isWifiEdited() {
+    return (_editSsid && _editSsid.length);
+  }
+
+  /**
+   * 機器側のJM1を登録する(WiFi設定無し)
+   */
+  function deviceRegistration(callback) {
+    if (!_targetPurifier) {
+      doCallback(callback, false);
+      return;
+    }
+    loading(true);
+    _targetPurifier.registerDevice(function() {
+      loading(false);
+      console.debug('[REG:Purifier] registerDevice OK');
+      doCallback(callback, true);
+    },
+    function(err) {
+      loading(false);
+      console.debug('[REG:Purifier] registerDevice ERR');
+      var errTitle   = 'Registration Failed';
+      var errMessage = 'Registration ERROR';
+      if (err) {
+        errMessage += '[' + errorText(err) + ']';
+      }
+      Activity.showDialog({title: errTitle, message: errMessage}, function() {
+        doCallback(callback, false);
+      });
+    });
+  }
+
+  /**
+   * BLE/WiFi Gatewayを登録し、pin codeを更新する
+   */
+  function wifiRegistration(callback) {
+    if (!_targetPurifier || !_targetBwGateway) {
+      doCallback(callback, false);
+      return;
+    }
+    var errTitle   = 'WiFi Setting Failed';
+    var errMessage = 'UNKNOWN ERROR';
+
+    loading(true);
+    var $dfd = $.Deferred().resolve();
+    $dfd.then(function() {
+      /******************************/
+      /* BLE/WiFi Gatewayの接続確認 */
+      /******************************/
+      console.debug('step[1]');
+      var $d = $.Deferred();
+      _targetBwGateway.startCommunication(function() {
+        $d.resolve();
+      },
+      function(err) {
+        errMessage = 'Communication ERROR';
+        if (err) {
+          errMessage += '[' + errorText(err) + ']';
+        }
+        Activity.showDialog({title: errTitle, message: errMessage}, function() {
+          $d.reject();
+        });
+      });
+      return $d.promise();
+    }).then(function() {
+      /***************************/
+      /* BLE/WiFi Gatewayの登録  */
+      /***************************/
+      console.debug('step[2]');
+      var $d = $.Deferred();
+      // 操作対象機器設定
+      _targetBwGateway.setTargetJm1UniqueId(_targetPurifier.getUniqueId());
+      // pinコード設定(ユーザー入力値)
+      _targetBwGateway.setPinCode(_editPin);
+      // 登録(LocalKey及び中継サーバー情報の払い出し)
+      _targetBwGateway.registerDevice(function() {
+        $d.resolve();
+      },
+      function(err) {
+        errMessage = 'Registration ERROR';
+        if (err) {
+          errMessage += '[' + errorText(err) + ']';
+        }
+        Activity.showDialog({title: errTitle, message: errMessage}, function() {
+          $d.reject();
+        });
+      });
+      return $d.promise();
+    }).then(function() {
+      /*****************/
+      /* Wi-Fi機器設定 */
+      /*****************/
+      console.debug('step[3]');
+      var $d = $.Deferred();
+      var args = {
+        ssid     : _editSsid,
+        password : _editPass
+      };
+      _targetBwGateway.initialSetup(args, function() {
+        $d.resolve();
+      },
+      function(err) {
+        var wifiModuleVersion = _targetBwGateway.getWifiModuleVersion();
+        console.debug('wifiModuleVersion:' + wifiModuleVersion);
+        if (err == BwGateway.ErrorTypes.AP_WRONG_PASSWORD) {
+          errMessage = 'SSID or Password are incorrect.';
+        } else
+        if (err == BwGateway.ErrorTypes.AP_CONNECTION_TIMEOUT && wifiModuleVersion == '2.0.0') {
+          errMessage = 'The password you entered might be incorrect. ' +
+                       'Please confirm the password and try again.\n\n' +
+                       'If the password is correct, please confirm if the Wi-Fi network is actually connected to internet.';
+        } else
+        if (err) {
+          errMessage = 'BWG ERROR[' + errorText(err) + ']';
+        }
+        Activity.showDialog({title: errTitle, message: errMessage}, function() {
+          $d.reject();
+        });
+      });
+      return $d.promise();
+    }).then(function() {
+      /***********************/
+      /* 機器側のJM1情報更新 */
+      /***********************/
+      console.debug('step[4]');
+      var $d = $.Deferred();
+      // pinコード設定(ユーザー入力値)
+      _targetPurifier.setPinCode(_editPin);
+      _targetPurifier.setWifiAccessible(true);
+      _targetPurifier.updateDevice(function() {
+        $d.resolve();
+      },
+      function(err) {
+        errMessage = 'WiFi access code save error.';
+        if (err) {
+          errMessage += '[' + errorText(err) + ']';
+        }
+        Activity.showDialog({title: errTitle, message: errMessage}, function() {
+          $d.reject();
+        });
+      });
+      return $d.promise();
+    }).done(function() {
+      doCallback(callback, true);
+    }).fail(function() {
+      // 失敗した場合は(WiFi設定が有効にならないよう)PINコードをリセットしておく
+      if (_targetPurifier.getPinCode()) {
+        _targetPurifier.setPinCode(null);
+        _targetPurifier.updateDevice();
+      }
+      doCallback(callback, false);
+    }).always(function() {
+      loading(false);
+    });
+  }
+
+  /**
+   * pin codeでWiFiを利用可能にする
+   * (BLE/WiFi Gatewayの登録は行わない)
+   */
+  function wifiActivation(callback) {
+    loading(true);
+    _targetPurifier.validatePinCode(_editPin, function() {
+      loading(false);
+      doCallback(callback, true);
+    },
+    function(err) {
+      loading(false);
+      doCallback(callback, false);
+    });
+  }
+
+  /**
+   * デバイスとの接続を維持した状態にする
+   * function実行時に接続中だった場合は何もしない
+   */
+  function retainConnection(targetDevice, callback) {
+    if (targetDevice.inCommunication()) {
+      callback(true);
+      return;
+    }
+    targetDevice.startCommunication(function() {
+      callback(true);
+    },
+    function() {
+      callback(false);
+    });
+  }
+
+  /**
+   * デバイス接続直前の状態チェックを行う
+   */
+  function preConditionCheck(targetDevice, callback) {
+    retainConnection(targetDevice, callback);
+  }
+
+  /**
+   * ユーザへのガイダンス
+   */
+  function guidance(message, err, duration) {
+  }
+
+  /**
+   * オーバーレイ表示状態の変更を通知するコールバックを登録する
+   * コールバック引数で状態(オーバーレイ非表示:true / オーバーレイ表示:false)を通知する
+   * 登録できるのは常に後勝ち
+   */
+  function overlayMonitorTimerStart(callback) {
+    if (_overlayMonitorTimerId) {
+      clearInterval(_overlayMonitorTimerId);
+    }
+    var $overlay = $('#overlay');
+    var state = $overlay.is(':empty');
+    _overlayMonitorTimerId = setInterval(function() {
+      var next = $overlay.is(':empty');
+      if (next != state) {
+        console.log('overlay state changed:' + next);
+        state = next;
+        callback.call(null, state);
+      }
+    }, 300);
+  }
+
+  function closeHandler(event) {
+    log('closeHandler');
+
+    // BLE/WiFi Gatewayと接続中の場合は切断しておく
+    if (_targetBwGateway && _targetBwGateway.inCommunication()) {
+      _targetBwGateway.stopCommunication();
+    }
+    Activity.closeSelf();
+  }
+
+  function loading(activated) {
+    /*
+    if (activated) {
+      var $overlay = $('<div id="loading-overlay"><div id="loading"><div class="ball"></div><div class="ball1"></div></div></div>');
+      $overlay.appendTo('body');
+    } else {
+      $('#loading-overlay').remove();
+    }
+    */
+    if (activated) {
+      if(!$('#loading-overlay').length){
+        $('<div id="loading-overlay"><div id="loading"><i class="icon-spinner icon-spin"></i></div></div>').appendTo('body');
+      }
+    } else {
+      $('#loading-overlay').remove();
+    }
+  }
+
+  function errorText(err) {
+    if (err) {
+      for (var key in BwGateway.ErrorTypes) {
+        if (BwGateway.ErrorTypes[key] == err) {
+          return key;
+        }
+      }
+      for (var key in Guardian.ErrorTypes) {
+        if (Guardian.ErrorTypes[key] == err) {
+          return key;
+        }
+      }
+      if (typeof(err) == 'number') {
+        return '0x' + err.toString(16);
+      }
+      return err;
+    }
+  }
+
+  function getText(id) {
+    return _textRes(id);
+  }
+
+  function initResources(callback) {
+    var option = {
+      lng: Activity.getBrowserLanguage(),
+      fallbackLng: 'en',
+    };
+    i18n.init(option, function(error, t) {
+      doCallback(callback, t);
+    });
+  }
+
+  function doCallback(callback, args) {
+    if (typeof callback == 'function') {
+      setTimeout(function() {
+        callback.call(null, args);
+      }, 0);
+    }
+  }
+
+  /**
+   * ScenarioId出力(確認用)
+   */
+  function printScenarioId() {
+    $._getScenarioId().done(function(scenario) {
+      console.warn('------------------- Scenario [' + scenario + '] -------------------');
+    });
+  }
+
+  function log(message) {
+    console.log('[LOG]', message);
+  }
+
+</script>
+</html>

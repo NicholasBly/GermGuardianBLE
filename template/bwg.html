@@ -1,0 +1,997 @@
+<div class="header bwg">
+  <div id="bwg-title" class="title">Wi-Fi Setting</div>
+  <div class="close-button">
+    <span class="icon-cross"></span>
+  </div>
+</div>
+<div class="bwg-panel">
+  <input class="pin" type="tel" pattern="\d*" size="4" maxlength="4" max="9999"/>
+</div>
+<div id="bwg-sections" style="display:none;">
+  <section id="s0" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row">
+          <p class="text box center">Please wait...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="s1-1" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row title">
+          <span class="text accent">Set Wi-Fi connection destination</span>
+        </div>
+        <div class="row">
+          <span id="bwg-s1-description" class="label"></span>
+        </div>
+      </div>
+      <div class="l-grid10 highlight">
+        <div class="row">
+          <div class="l-grid10">
+            <form class="text device-info-form" onsubmit="return false;">
+              <!-- Bluetooth Wi-Fi Gateway 登録情報(SSID, 暗号化キー) -->
+              <div id="bwg-ap-ssid" class="row">
+                <span id="bwg-ap-ssid-name" class="label"></span>
+                <div class="ap-item-box meta">
+                  <div class="loading"><i class="ap-loading-icon icon-spinner icon-spin"></i></div>
+                  <div class="lock"><span class="icon-lock"></span></div>
+                  <div class="wifi"><span class="icon-wifi3"></span></div>
+                </div>
+              </div>
+              <div id="bwg-ap-password" class="row">
+                <span class="label bwg-password-label"></span>
+                <input id="bwg-password-input" type="password"></input>
+              </div>
+              <div id="bwg-ap-password-check" class="row">
+                <input type="checkbox"></input>
+                <label class="label bwg-password-check-label" for="bwg-password-check"></label>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div id="bwg-next" class="row">
+          <div id="next-button" class="label large-button">
+            <span>Next</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <br>
+    <p class="box center">
+      <span id="select-ap">
+        <span class="icon-setting"></span>
+        <span class="select-alter-ssid-label"></span>
+      </span>
+    </p>
+  </section>
+  <section id="s1-3" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row">
+          <span class="text"><span class="icon-setting description"></span>&nbsp;<span id="select-ssid-text"></span></span>
+          <i class="ap-loading-icon icon-spinner icon-spin right"></i>
+        </div>
+      </div>
+      <div class="l-grid10 ap-list-wrapper highlight">
+        <ul class="ap-list">
+          <li id="ap-edit-button" class="row button-item">
+            <span id="ap-edit-label" class="label"></span>
+            <span class="icon-next"></span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <section id="s1-6" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row title">
+          <span class="text accent">Set Wi-Fi connection destination</span>
+        </div>
+        <div class="row">
+          <span id="bwg-s1-6-description" class="text"></span>
+        </div>
+      </div>
+      <div class="l-grid10 highlight">
+        <div class="row">
+          <div class="l-grid10">
+            <form class="device-info-form" onsubmit="return false;">
+            <!-- Bluetooth Wi-Fi Gateway 登録情報(SSID, 暗号化キー) -->
+              <div class="row">
+                <span class="label bwg-ssid-label"></span>
+                <input id="bwg-ssid-input" type="text"></input>
+              </div>
+              <div id="bwg-ap-password" class="row">
+                <span class="label bwg-password-label"></span>
+                <input id="bwg-password-input" type="password"></input>
+              </div>
+              <div id="bwg-ap-password-check" class="row">
+                <input id="bwg-password-check" type="checkbox"></input>
+                <label class="label bwg-password-check-label" for="bwg-password-check"></label>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="row">
+          <div id="next-button" class="label large-button">
+            <span>Next</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <br>
+    <p class="box center">
+      <span id="select-ap">
+        <span class="icon-setting"></span>
+        <span class="select-alter-ssid-label"></span>
+      </span>
+    </p>
+  </section>
+  <section id="s1-e1" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10 highlight">
+        <div class="row">
+          <p class="box center">
+            <img src="./img/gtset01.png" style="max-height:120px;">
+          </p>
+          <h1 id="bwg-s1-e1-message" class="middle-text center"></h1>
+          <p id="bwg-s1-e1-description" class="box middle-text center"></p>
+        </div>
+        <div class="row">
+          <div id="close-button" class="large-button">
+            <span>OK</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="box center">
+      <span id="select-ap">
+        <span class="icon-setting"></span>
+        <span class="select-alter-ssid-label"></span>
+      </span>
+    </p>
+  </section>
+  <section id="s1-e2" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10 highlight">
+        <div class="row">
+          <p class="box center">
+            <img src="./img/gtset02.png" style="max-height:120px;">
+          </p>
+          <h1 id="bwg-s1-e2-message" class="middle-text center"></h1>
+          <p id="bwg-s1-e2-description" class="box middle-text center"></p>
+        </div>
+        <div class="row">
+          <div id="close-button" class="large-button">
+            <span>OK</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="box center">
+      <span id="select-ap">
+        <span class="icon-setting"></span>
+        <span class="select-alter-ssid-label"></span>
+      </span>
+    </p>
+  </section>
+  <section id="wf1" class="bwg-section">
+    <div class="l-grid-wrapper">
+      <div class="l-grid10">
+        <div class="row">
+          <table id="select-wifi-setting" class="balloon">
+            <tr><th>Initial Wi-Fi setup<br>or<br>Reset Wi-Fi & Device Security PIN</th></tr>
+            <tr>
+              <td>
+                <img src="./img/wf1_img02.jpg">
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div class="row">
+          <table id="select-access-code" class="balloon">
+            <tr><th>Additional User Set Up</th></tr>
+            <tr>
+              <td>
+                <span class="middle-text">Enter security pin designated by initial user.</span>
+                <img src="./img/wf1_img01.jpg">
+              </td>
+            </tr>
+          </table>
+        </div>
+        <p class="box center">
+          <span id="using-bluetooth" class="using-bluetooth-only-label accent anchor">Bluetooth connection only</span>
+        </p>
+      </div>
+    </div>
+  </section>
+  <section id="wf2" class="bwg-section">
+    <div class="l-grid10">
+      <div class="row title">
+        <span id="bwg-wf2-description" class="text accent">Enter Device 4-digit Security PIN</span>
+      </div>
+      <div class="row">
+        <p class="middle-text">Enter the security PIN assigned by the initial user of the app.</p>
+      </div>
+    </div>
+    <p class="box center">
+      <span class="pin-code center">----</span>
+    </p>
+  </section>
+  <section id="wf3-8" class="bwg-section">
+    <div class="l-grid10">
+      <div class="row title">
+        <span id="bwg-wf2-description" class="text accent">Choose a 4-digit Security PIN</span>
+      </div>
+      <div class="row">
+        <p class="middle-text">This is a code that will be needed for any additional app user, setting up the device, on the same Wi-Fi network.</p>
+      </div>
+    </div>
+    <p class="box center">
+      <span class="pin-code center">----</span>
+    </p>
+  </section>
+</div>
+<div id="bwg-template" style="display:none;">
+  <ul>
+    <li class="row ap-item">
+      <span class="label name"></span>
+      <div class="meta">
+        <span class="lock"><span class="icon-lock"></span></span>
+        <span class="wifi"><span class="icon-wifi3"></span></span>
+      </div>
+    </li>
+  </ul>
+</div>
+<!-- <script src="./js/bwgope.js"></script> -->
+<script type="text/javascript">
+  'use strict';
+
+(function($) {
+  var _registrationDevice;
+  var _apList = {}; // key mac-address
+  var _ssidLocal;   // 設定しようとしているAPのSSID
+  var _macLocal;    // 設定しようとしているAPのmacアドレス
+  var _passLocal;   // 設定しようとしているAPのパスワード
+
+  var $header = $('.header.bwg');
+  var $bwgPanel = $('.bwg-panel');
+
+  /**
+   * JM1デバイスとデータ通信を行うためには以下の対応が必要となる
+   * - LocalKeyを保持していないデバイス => localKey指定無しでstartCommunication()する
+   * - LocalKeyを保持しているデバイス   => localKey(一致するもの)指定有りでstartCommunication()する
+   *
+   * ここで、登録しようとしているデバイスに未知のLocalKeyが保存されているケースの考慮が必要である
+   * 現状では、LocalKeyを直接取得(タッチ操作)せずにそのようなデバイスとデータ通信する術は存在しない
+   * そのため、必要に応じてユーザーにタッチ操作を要求する画面を表示する
+   * 厳密な判定は現状のhubea.js上では不可能なため、以下の条件でデバイスに何らかのLocalKeyがあるものと判定する
+   *
+   * (1) LocalKey指定無しでstartCommunication()し、inRange状態にする
+   * (2) (1)の接続上で最初に実行するDataBlockSender.send()がエラーになる
+   *
+   * 尚、予めLocalKey指定有りでstartCommunication()してしまうと
+   * デバイスにLocalKeyが無い、または異なるLocalKeyがある場合、いつまでもinRangeにならない動作にしかならないため
+   * LocalKey不一致かどうかの判断は不可能。
+   * 従い、必ずLocalKey無しの接続でチェックする必要がある。
+   * (キャッシュ上にLocalKey情報があったとしても、実デバイス上のそれと一致する保証はない)
+   */
+  var _sneaked          = false;  // LocalKey参照を行ったかどうか
+
+  $('document').ready(function () {
+    onInitialize();
+  });
+
+  function onInitialize() {
+    if (!(_targetBwGateway instanceof BwGateway)) {
+      Activity.fatalExit('_targetBwGateway not found.');
+      return;
+    }
+    _registrationDevice = _targetBwGateway;
+    // タッチ発火抑止処理開始
+    Activity.preventTouchTimerStart(_registrationDevice.getUniqueId(), 5000);
+
+    initComponents();
+
+    showOverlaySection('wf1');
+  }
+
+  /**
+   * WiFi設定を行う初期画面へ遷移する(PIN入力のみは来ない)
+   */
+  function firstSection() {
+    loading(true);
+    // 1. 通信準備
+    prepareBwGateway(_registrationDevice, function(success) {
+      if (!success) {
+        loading(false);
+        // デバイス間通信がうまくいかない(やり直し)
+        Activity.showDialog({title: '[BWG] ERROR', message: 'Communication failed'}, function() {
+          goBack();
+        });
+        return;
+      }
+      // 2.端末がWi-Fiに接続しているか
+      getSsidLocal().always(function() {
+        monitorAccessPointStart(_ssidLocal, function() {
+          loading(false);
+          if (_ssidLocal) {
+            showOverlaySection('s1-1');
+          } else {
+            showOverlaySection('s1-3');
+          }
+        },
+        function(err) {
+          loading(false);
+          // デバイス間通信がうまくいかない(やり直し)
+          var errMessage = 'Communication failed';
+          if (err) {
+            errMessage += '[' + errorText(err) + ']';
+          }
+          Activity.showDialog({title: '[BWG] ERROR', message: errMessage}, function() {
+            goBack();
+          });
+        });
+      });
+    });
+  }
+
+  function showOverlaySection(sectionId) {
+    log('showOverlaySection:' + sectionId);
+
+    var $section = $('#bwg-sections #' + sectionId).clone();
+    var $wrapper = $bwgPanel.find('.wrapper');
+
+    // debugger;
+    if (0 < $wrapper.length) {
+      $wrapper.replaceWith($('<div class="wrapper">').append($section));
+    } else {
+      $bwgPanel.append($('<div class="wrapper">').append($section));
+    }
+
+    initLayout(_registrationDevice, $section);
+    resizePanel();
+
+    log('showOverlaySection complete');
+  }
+
+  function currentSectionId() {
+    return $bwgPanel.find('.wrapper > section').attr('id');
+  }
+
+  function initComponents() {
+    //$('.edit-cancel-label').text(getText('app.label_cancel'));
+    $('.bwg-ssid-label').text(getText('app.label_bwg_ssid'));
+    $('.bwg-password-label').text(getText('app.label_bwg_password'));
+    $('.bwg-password-check-label').text(getText('app.labeL_bwg_password_check'));
+    $('.select-alter-ssid-label').text(getText('app.text_wifi_use_alter_access_point'));
+
+    // [s1-1]
+    $('#bwg-s1-title').text(getText('app.text_wifi_access_point_setting'));
+    $('#bwg-s1-description').text(getText('app.text_wifi_use_current_access_point'));
+
+    // [s1-3]
+    $('#select-ssid-text').text(getText('app.text_wifi_select_ssid'));
+    $('#ap-edit-label').text(getText('app.label_wifi_manual_input'));
+
+    // [s1-6]
+    $('#bwg-s1-6-description').text(getText('app.text_wifi_manual_input_access_point'));
+
+    // [s1-e1]
+    $('#bwg-s1-e1-title').text(getText('app.text_wifi_access_point_setting'));
+    $('#bwg-s1-e1-message').text(getText('app.text_wifi_no_current_access_point_message'));
+    $('#bwg-s1-e1-description').text(getText('app.text_wifi_no_current_access_point_description'));
+
+    // [s1-e2]
+    $('#bwg-s1-e2-title').text(getText('app.text_wifi_access_point_setting'));
+    $('#bwg-s1-e2-message').text(getText('app.text_wifi_unconnectable_gateway_message'));
+    $('#bwg-s1-e2-description').text(getText('app.text_wifi_unconnectable_gateway_description'));
+
+    // [wf1]
+    // [wf2]
+
+    // Event Handler
+    $('.close-button', $header).on('click', onCancel);
+  }
+
+  function resizePanel() {
+    $bwgPanel.height(document.body.clientHeight - $header.outerHeight());
+  }
+
+  function initLayout(device, $section) {
+    var sectionId = $section.attr('id');
+    log('section[' + sectionId + '] initLayout:', device);
+
+    do {
+      if (sectionId == 's0') {
+        firstSection();
+        $('#bwg-title-sub').text('Please wait');
+      } else if (sectionId == 's1-1') {
+        //***********//
+        //  [S1-1]   //
+        //***********//
+        $('#bwg-title-sub').text(getText('app.label_wifi_settings'));
+        var $apItem = $('#bwg-ap-ssid', $section);
+        var $apPass = $('#bwg-ap-password', $section).hide();
+        var $apPassCheck = $('#bwg-ap-password-check', $section).hide();
+        var $next   = $('#bwg-next', $section).hide();
+
+        $apItem.find('#bwg-ap-ssid-name').text(_ssidLocal);
+        var $loading = $apItem.find('.loading');
+        var $lock = $apItem.find('.lock').css('display', 'none');
+        var $wifi = $apItem.find('.wifi').css('display', 'none');
+
+        var setApInfo = function(ap) {
+          $loading.hide();
+          if (ap.ecn == 0) {
+            $apPass.hide();
+            $apPassCheck.hide();
+          } else {
+            $apPass.show();
+            $apPassCheck.show();
+            $lock.css('display', 'inline-block');
+          }
+          $wifi.css('display', 'inline-block')
+            .find('span').removeClass().addClass(getWifiClass(ap.rssi));
+          $next.show();
+        }
+
+        // SSID選択から戻ってきた場合はその値を表示
+        if (_macLocal) {
+          if (_apList[_macLocal]) {
+            setApInfo(_apList[_macLocal]);
+          }
+        }
+        setAccessPointUpdateListener(function(apList) {
+          var ap = getAccessPointFromSsid(_ssidLocal);
+          if (ap) {
+            setApInfo(ap);
+          }
+        });
+
+        $('input', $apPassCheck).on('change', togglePassword);
+        $('#next-button', $section).on('click', function() {
+          monitorAccessPointStop(function() {
+            _passLocal = $('#bwg-password-input').val();
+
+            _editSsid = _ssidLocal;
+            _editPass = _passLocal;
+
+            // WiFi access code入力画面へ
+            showOverlaySection('wf3-8');
+          });
+          $('input.pin').focus();
+        });
+        $('#select-ap', $section).on('click', onSelectAccessPointHandler);
+
+      } else if (sectionId == 's1-3') {
+        //***********//
+        //  [S1-3]   //
+        //***********//
+        $('#bwg-title-sub').text(getText('app.label_wifi_settings'));
+        var $apList = $('.ap-list', $section);
+        var $loading = $('.ap-loading-icon', $section);
+        var monitorCount = 0;
+        var limitCount = 10;
+
+        setAccessPointUpdateListener(function(apList) {
+          if (!Array.isArray(apList)) {
+            return;
+          }
+          // remove expired ap items
+          var now = Date.now();
+          $apList.find('.ap-item').each(function() {
+            var $apItem = $(this);
+            var mac  = $apItem.data('mac');
+            var time = $apItem.data('time');
+            if ((time + 30000) < now && !apList.some(function(ap) {
+              return (ap.mac == mac);
+            })) {
+              $apItem.remove();
+            }
+          });
+          for (var i = 0; i < apList.length; i++) {
+            var ap = apList[i];
+            var $apItem = $apList.find('.ap-item[data-mac="' + ap.mac + '"]');
+            if ($apItem.length) {
+              $apItem.attr('data-time', Date.now());
+              $apItem.find('.name').text(ap.ssid);
+              $apItem.find('.wifi span').removeClass().addClass(getWifiClass(ap.rssi));
+              continue;
+            }
+            $apItem = $('#bwg-template .ap-item').clone().attr({
+              'data-ssid': ap.ssid,
+              'data-ecn' : ap.ecn,
+              'data-mac' : ap.mac,
+              'data-time': now
+            });
+            $apItem.find('.name').text(ap.ssid);
+            $apItem.find('.wifi span').removeClass().addClass(getWifiClass(ap.rssi));
+            if (ap.ecn == 0) {
+              $apItem.find('.lock').hide();
+            }
+            $apItem
+            .on('touchstart', function() {
+              $(this).addClass('pressed');
+            })
+            .on('touchend touchcancel', function() {
+              $(this).removeClass('pressed');
+            })
+            .on('click', function() {
+              var self = $(this);
+              var ssid = self.attr('data-ssid');
+              var mac  = self.attr('data-mac');
+              $loading.hide();
+              loading(true);
+              monitorAccessPointStart(ssid, function() {
+                loading(false);
+                _ssidLocal = ssid;
+                _macLocal  = mac;
+                showOverlaySection('s1-1');
+              }, function(err) {
+                loading(false);
+              });
+            });
+            $apList.prepend($apItem);
+          }
+        });
+
+        $('#ap-edit-button', $section)
+        .on('touchstart', function() {
+          $(this).addClass('pressed');
+        })
+        .on('touchend touchcancel', function() {
+          $(this).removeClass('pressed');
+        })
+        .on('click', function() {
+          $loading.hide();
+          monitorAccessPointStop();
+          showOverlaySection('s1-6');
+        });
+
+        // サイズ調整
+        $apList.parent().height(document.body.clientHeight - $apList.parent().offset().top);
+
+      } else if (sectionId == 's1-6') {
+        //***********//
+        //  [S1-6]   //
+        //***********//
+        $('#bwg-title-sub').text(getText('app.label_wifi_settings'));
+
+        $('#bwg-password-check', $section).on('change', togglePassword);
+        $('#next-button', $section).on('click', function() {
+          _ssidLocal = $('#bwg-ssid-input').val();
+          _passLocal = $('#bwg-password-input').val();
+
+          _editSsid = _ssidLocal;
+          _editPass = _passLocal;
+
+          // WiFi access code入力画面へ
+          $('input.pin').focus();
+          showOverlaySection('wf3-8');
+        });
+
+        $('#select-ap', $section).on('click', onSelectAccessPointHandler);
+
+      } else if (sectionId == 's1-e1') {
+        //***********//
+        //  [S1-E1]  //
+        //***********//
+        $('#bwg-title-sub').text(getText('app.label_wifi_settings'));
+        $('#close-button', $section).on('click', onCancel);
+
+        $('#select-ap', $section).on('click', onSelectAccessPointHandler);
+
+      } else if (sectionId == 's1-e2') {
+        //***********//
+        //  [S1-E2]  //
+        //***********//
+        $('#bwg-title-sub').text(getText('app.label_wifi_settings'));
+        $('#close-button', $section).on('click', onCancel);
+
+        $('#select-ap', $section).on('click', onSelectAccessPointHandler);
+
+      } else if (sectionId == 'wf1') {
+        //**********//
+        //  [WF1]   //
+        //**********//
+        $('#select-wifi-setting', $section)
+        .on('touchstart', function() {
+          $(this).addClass('pressed');
+        })
+        .on('touchend touchcancel', function() {
+          $(this).removeClass('pressed');
+        })
+        .on('click', function() {
+          showOverlaySection('s0');
+        });
+        $('#select-access-code', $section)
+        .on('touchstart', function() {
+          $(this).addClass('pressed');
+        })
+        .on('touchend touchcancel', function() {
+          $(this).removeClass('pressed');
+        })
+        .on('click', function() {
+          $('input.pin').focus();
+          showOverlaySection('wf2');
+        });
+        $('#using-bluetooth', $section).on('click', goBack);
+
+      } else if (sectionId == 'wf2' || sectionId == 'wf3-8') {
+        //*****************//
+        //  [WF2]/[WF3-8]  //
+        //*****************//
+        var $pinCode = $('.pin-code', $section);
+        var $pinInput = $('input.pin').unbind().on('keyup', function() {
+          var inputValue = $(this).val();
+          // 数字以外、4文字以上はフィルタ
+          while (!/^[0-9]{0,4}$/.test(inputValue)) {
+            inputValue = inputValue.slice(0, inputValue.length - 1);
+          }
+          var text = '';
+          for (var i = 0; i < inputValue.length; i++) {
+            text += '*';
+          }
+          text += '----';
+          $pinCode.text(text.slice(0, 4));
+          if (inputValue != $(this).val()) {
+            $(this).val(inputValue);
+          }
+          // 4桁入力された時点でフォーカスアウト(確定扱い)
+          if (inputValue.length == 4) {
+            $pinInput.blur();
+          }
+        }).change(function() {
+          var value = $(this).val();
+          console.log('onchange=' + value);
+          // 4桁入力された時点でこの画面は完了
+          if (value.length == 4) {
+            _editPin = value;
+            if (sectionId == 'wf3-8') {
+              // WiFi設定(登録)開始
+              wifiRegistration(function(success) {
+                if (success) {
+                 // Congratulations
+                  Activity.showDialog({
+                    title  : 'Wi-Fi Setup is complete!',
+                    message: 'Device Security PIN for this Wi-Fi network is [' + value + ']'
+                  }, function() {
+                    goBack();
+                  });
+                } else {
+                  // 設定に失敗した場合は接続維持した状態で初期画面に戻る
+                  retainConnection(_registrationDevice, function(success) {
+                    log('[BWG] retainConnection() ' + (success ? 'success' : 'failed') + '.');
+                  });
+                  showOverlaySection('wf1');
+                }
+              });
+            } else {
+              // PINコード入力のみ
+              wifiActivation(function(success) {
+                if (success) {
+                  // Congratulations
+                  Activity.showDialog({
+                    title  : 'Success!',
+                    message: 'Wi-Fi setting is completed.'
+                  }, function() {
+                    goBack();
+                  });
+                } else {
+                  // Reset
+                  Activity.showDialog({
+                    title  : 'Error',
+                    message: 'Invalid Device Security PIN.'
+                  }, function() {
+                    $pinInput.val('');
+                    $pinCode.text('----');
+                    $pinInput.focus(); // FIXME: これは効かないのでユーザーの誘導が必要かも
+                  });
+                }
+              });
+            }
+          }
+        }).val('');
+
+        $pinCode.text('----').click(function() {
+          $pinInput.focus();
+        });
+      }
+
+    } while(false);
+
+    // Event Handlers
+    $('.large-button', $section).on('touchstart', function() {
+      $(this).addClass('pressed');
+    }).on('touchend touchcancel', function() {
+      $(this).removeClass('pressed');
+    });
+
+  }
+
+  /**
+   * 「その他のSSIDでWi-Fiを設定」が選択された場合のイベントハンドラ
+   *  正常系に行先は's1-3'固定
+   *  遷移できない場合は問題に応じた復帰画面を経由してリトライする
+   */
+  function onSelectAccessPointHandler() {
+    loading(true);
+    monitorAccessPointStart(null,
+      function() {
+        loading(false);
+        showOverlaySection('s1-3');
+      },
+      function(err) {
+        loading(false);
+        // デバイス間通信がうまくいかない(やり直し)
+        var errMessage = 'Communication failed';
+        if (err) {
+          errMessage += '[' + errorText(err) + ']';
+        }
+        Activity.showDialog({title: '[BWG] ERROR', message: errMessage}, function() {
+          goBack();
+        });
+      }
+    );
+  }
+
+  /**
+   * Gatewayとデータ通信するためにLocalKeyをチェックする
+   * この時点ではユーザーが設定を確定していないため、すでにLocalKeyがある場合はその値を参照するだけに止める
+   * LocalKeyが未設定(出荷直後)の場合のみ新規LocalKeyの払い出しを行う
+   */
+  function prepareBwGateway(device, callback) {
+    if (!(device instanceof BwGateway)) {
+      doCallback(callback, false);
+      return;
+    }
+    console.debug('prepareBwGateway start');
+    sneakProcessStart(30000, function() {
+      doCallback(callback, true);      
+    }, function() {
+      doCallback(callback, false);
+    });
+  }
+
+  function monitorAccessPointStart(ssid, success, fail) {
+    if (!_registrationDevice) {
+      console.error('registrationDevice not found');
+      doCallback(fail);
+      return;
+    }
+    monitorAccessPointStop(function() {
+      var args = {
+        ssid: ssid,
+        interval: 5000
+      };
+      _registrationDevice.startAccessPointUpdate(args,
+        function() {
+          doCallback(success);
+        },
+        function(err) {
+          doCallback(fail, err);
+        },
+        onAccessPointUpdate
+      );
+    }, function(err) {
+      doCallback(fail, err);
+    });
+  }
+
+  function monitorAccessPointStop(complete) {
+    _registrationDevice.stopAccessPointUpdate(
+      function() {
+        doCallback(complete, true);
+      },
+      function() {
+        doCallback(complete, false);
+      }
+    );
+  }
+
+  /**
+   * デバイスのLocalKey取得を一定時間の間リトライし続ける
+   * (登録操作ではない)
+   */
+  var _sneakProcId = 0;
+  function sneakProcessStart(timeout, success, fail) {
+    if (!_registrationDevice) {
+      console.error('registrationDevice not found');
+      doCallback(fail);
+    }
+    var startTime = Date.now();
+    var exitTime = startTime + timeout;
+
+    // reentrant function
+    var sneakProc = function(id) {
+      if (id != _sneakProcId) {
+        return;
+      }
+      if (startTime != exitTime && exitTime < Date.now()) {
+        doCallback(fail);
+        return;
+      }
+      _registrationDevice.sneakLocalKey(
+        function() {
+          log('sneakLocalKey OK');
+          _sneaked = true;
+          setTimeout(function() {
+            doCallback(success);
+          }, 0);
+        },
+        function(err) {
+          log('sneakLocalKey NG');
+          setTimeout(function() {
+            sneakProc(id);
+          }, 1000);
+        }
+      );
+    }
+    sneakProc(++_sneakProcId);
+  }
+
+  function sneakProcessStop() {
+    if (_sneakProcId) {
+      _sneakProcId = 0;
+    }
+  }
+
+  function onAccessPointUpdate(apList) {
+    console.debug('onAccessPointUpdate()', apList);
+    if (!Array.isArray(apList) || 0 == apList.length) {
+      return;
+    }
+    for (var i = 0; i < apList.length; i++) {
+      apList[i].timestamp = Date.now();
+      _apList[apList[i].mac] = apList[i];
+    }
+    if (_accessPointUpdateListener) {
+      doCallback(_accessPointUpdateListener, apList);
+    }
+  }
+
+  var _accessPointUpdateListener;
+  function setAccessPointUpdateListener(listener) {
+    _accessPointUpdateListener = listener;
+  }
+
+  function togglePassword() {
+    var checked = $(this).prop('checked');
+    var $input = $('#bwg-password-input');
+    var type = $input.attr('type');
+    if (checked) {
+      type = 'text';
+    } else {
+      type = 'password';
+    }
+    var $next = $('<input>').attr({
+      id: $input.attr('id'),
+      class: $input.attr('class'),
+      type: type
+    });
+    $next.val($input.val());
+    $input.replaceWith($next);
+    $next.focus();
+  }
+
+  function getSsidLocal() {
+    return $.Deferred(function($dfd) {
+      if (_ssidLocal) {
+        $dfd.resolve(_ssidLocal);
+        return;
+      }
+      try {
+        hubea.system.net.getNetworkInfo({},
+          function(info) {
+            if (info.ssid) {
+              _ssidLocal = info.ssid;
+            }
+            $dfd.resolve(_ssidLocal);
+          },
+          function(e) {
+            console.error('getSsidLocal:', e);
+            $dfd.reject();
+          }
+        );
+      } catch (e) {
+        $dfd.reject();
+      }
+    });
+  }
+
+  function getAccessPointFromSsid(ssid) {
+    for (var mac in _apList) {
+      var ap = _apList[mac];
+      if (ap.ssid == ssid) {
+        return ap;
+      }
+    }
+  }
+
+  function pingRelayServer() {
+    return $.Deferred(function($dfd) {
+      if (!_registrationDevice) {
+        $dfd.reject();
+        return;
+      }
+      _registrationDevice.pingRelayServer(
+        function() {
+          $dfd.resolve();
+        },
+        function() {
+          $dfd.reject();
+        }
+      );
+    });
+  }
+
+  function getWifiClass(rssi) {
+    var wifiClass;
+    var strength = getSignalStrength(rssi);
+    if (80 < strength) {
+      wifiClass = 'icon-wifi3';
+    } else
+    if (40 < strength) {
+      wifiClass = 'icon-wifi2';
+    } else {
+      wifiClass = 'icon-wifi1';
+    }
+    return wifiClass;
+  }
+
+  function getSignalStrength(rssi) {
+    if (typeof rssi == 'string') {
+      rssi = parseInt(rssi);
+    }
+    if (-50 < rssi) {
+      return 100;
+    } else
+    if (rssi < -100) {
+      return 0;
+    } else {
+      return (rssi + 100) * 2;
+    }
+  }
+
+  function onCancel() {
+    Activity.showDialog({
+      message: 'Are you sure you want to cancel the Wi-Fi set up?',
+      positive: 'Cancel',
+      negative: 'Return to Wi-Fi set up'
+    }, function(result) {
+      if (result.result == 'positive') {
+        goBack();
+      }
+    });
+  }
+
+  function goBack() {
+    log('goBack called.');
+
+    sneakProcessStop();
+    monitorAccessPointStop();
+
+    if (_registrationDevice && _registrationDevice.inCommunication()) {
+      _registrationDevice.stopCommunication();
+    }
+
+    if (isRegistrationMode()) {
+      routes.overlayRemove();
+    } else {
+      Activity.closeSelf();
+    }
+  }
+
+  var windowResizingTimer;
+  $(window).resize(function() {
+    if (windowResizingTimer) {
+      clearTimeout(windowResizingTimer);
+    }
+    windowResizingTimer = setTimeout(resizePanel, 200);
+  });
+
+})(jQuery);
+</script>

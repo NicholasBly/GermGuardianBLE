@@ -1,0 +1,75 @@
+<div id="setting-panel">
+  <div class="header">
+    <div class="close-button">
+      <span class="icon-cross"></span>
+    </div>
+    <div class="title">
+      <span>About account services</span>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row trans">
+      <table id="device-management" class="balloon">
+        <thead>
+          <tr><th>Device Management</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <img src="./img/inst-acc01.png">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <p>Registered information of the device will be saved on your account. This is useful when sharing your device with multiple smartphones or when replacing smartphones.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="row trans">
+      <table id="voice-control" class="balloon">
+        <thead>
+          <tr><th>Voice control</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <img src="./img/inst-acc02.png">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <p>By coordinating with Amazon Echo and/or Google Home products you will be able control the device with your voice.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  'use strict';
+
+  (function() {
+    var _$panel;
+
+    $(function() {
+      initialize();
+    });
+
+    function initialize() {
+      _$panel = $('#setting-panel');
+      // BACK
+      $('.close-button', _$panel).click(backHandler);
+    }
+
+    function backHandler(event) {
+      log('backHandler');
+      routes.startup.help(false);
+    }
+
+  })();
+
+</script>
+</html>

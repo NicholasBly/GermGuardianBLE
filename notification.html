@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Guardian</title>
+
+  <link rel="stylesheet" href="./css/icomoon.css">
+  <link rel="stylesheet" href="./css/style.css">
+
+  <script src="./js/jquery-2.1.4.min.js"></script>
+  <script src="./js/hubea-r8533.js"></script>
+  <script src="./js/activity.js"></script>
+</head>
+<body>
+<div class="header trans">
+  <div class="close-button">
+    <span class="icon-cross"></span>
+  </div>
+  <div class="title">
+    <img src="./img/logo.png">
+  </div>
+</div>
+<div class="content">
+  <div class="notification-banner">
+    <img src="./img/pn_filter.jpg">
+    <span class="name"></span>
+    <p class="message"></p>
+    <a href="javascript:void(0)">Order now ≫</a>
+  </div>
+</div>
+<div class="footer">
+  <img id="banner" style="width: 100%" src="./img/banner.jpg">
+</div>
+</body>
+<script type="text/javascript">
+  'use strict';
+  var bannerURL = 'https://www.guardiantechnologies.com/accessories-bulbs-filters/accessories-bulbs-filters-flt4825-filter-b-true-hepa-replacement-filter.html?utm_source=cdap4500app&utm_campaign=cdap4500appreminder&utm_medium=banner&utm_content=appreplacereminder';
+
+  $(function() {
+    printScenarioId();
+    initialize();
+  });
+
+  function initialize() {
+    // デフォルトはフィルタ交換表示
+    // fragmentの指定に応じてバルブ交換表示にしたり、文言を切り替える
+    var $banner = $('.notification-banner');
+    Activity.getParams(function(params) {
+      if (params && params.fragmentParams) {
+        var fragments = params.fragmentParams;
+        var filterImg = 'pn_filter-b.png';
+        var bulbImg   = 'pn_bulb.jpg';
+        if (fragments.name) {
+          $('.name', $banner).text('"' + fragments.name + '"');
+        }
+        if (fragments.model == 'CDAP5500BCA') {
+          filterImg = 'pn_filter-c.png';
+          bannerURL = 'https://www.guardiantechnologies.com/accessories-bulbs-filters/accessories-bulbs-filters-flt5000-filter-c-pet-true-hepa-pet-pure-replacement-filter.html?' +
+                      'utm_source=cdap5500app&utm_campaign=cdap5500appreminder&utm_medium=banner&utm_content=appreplacereminder';
+        }
+        switch (fragments.type) {
+        case 'filter_soon': // PN filter1
+          $('.message', $banner).text('HEPA Filter needs to be replaced soon.');
+          $('img', $banner).attr('src', './img/' + filterImg);
+          break;
+        case 'filter_now':  // PN filter2
+          $('.message', $banner).text('Please replace the HEPA Filter.');
+          $('img', $banner).attr('src', './img/' + filterImg);
+          break;
+        case 'bulb_soon':   // PN uv1
+          $('.message', $banner).text('UV-C Bulb needs to be replaced soon.');
+          $('img', $banner).attr('src', './img/' + bulbImg);
+          break;
+        case 'bulb_now':    // PN uv2
+          $('.message', $banner).text('Please replace the UV-C Bulb.');
+          $('img', $banner).attr('src', './img/' + bulbImg);
+          break;
+        }
+      }
+      $('.close-button').click(closeHandler);
+      $banner.click(bannerHandler);
+      $('.footer #banner').click(bannerHandler);
+    });
+  }
+
+  function closeHandler(event) {
+    log('closeHandler');
+    Activity.closeSelf();
+  }
+
+  function bannerHandler(event) {
+    log('bannerHandler');
+    var shoppingUrl = hubea.util.absolutePath('./shopping.html');
+    Activity.launchActivity(shoppingUrl);
+  }
+
+  /**
+   * ScenarioId出力(確認用)
+   */
+  function printScenarioId() {
+    $._getScenarioId().done(function(scenario) {
+      console.warn('------------------- Scenario [' + scenario + '] -------------------');
+    });
+  }
+
+  function log(message) {
+    console.log('[LOG]', message);
+  }
+
+  /* guardian.jsから引用 */
+  $._getScenarioId = function() {
+    return $.Deferred(function($dfd) {
+      try {
+        hubea.service.model.Scenario.getInstance(function(scenario) {
+          var id = 0; // 取得に成功した以上は値を付与する(初期値はサービス指定無し)
+          if (scenario && scenario.id) {
+            id = scenario.id;
+          }
+          $dfd.resolve(id);
+        });
+      } catch (e) {
+        $dfd.reject(e);
+      }
+    });
+  }
+</script>
+</html>
