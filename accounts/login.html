@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="description" content="hubea">
+  <link href="css/admin.css" rel="stylesheet">
+  <title>Log in | Guardian TE</title>
+</head>
+<body>
+  <div id="app">
+
+    <header>
+      <nav class="m-navbar">
+        <div class="left-button icon-close" v-on:click="returnToApp"></div>
+      </nav>
+    </header>
+
+    <div id="l-wrapper">
+
+      <div class="absoluter-c-msg" v-show="errorMessage">
+        <!--msg-area-->
+        <div class="m-msg-box-login01">{{ errorMessage }}</div>
+        <!--//msg-area-->
+      </div>
+
+      <div class="m-box-wrap">
+        <!--main-area-->
+        <div class="m-box absoluter-c-position">
+          <div class="m-box-logo-info">
+            <p class="m-box-logo-info-header">Account Settings</p>
+            <p class="description">Please enter your user ID and password
+            </p>
+          </div>
+          <div class="m-box-inner-form-wrap-wide">
+            <form v-on:submit.prevent>
+              <ul class="m-box-inner-form-para">
+                <li>
+                  <input type="text" class="m-form-min" placeholder="user ID or email" maxlength="128" autocorrect="off" autocapitalize="none" v-model.trim="username">
+                </li>
+                <li>
+                  <input type="password" class="m-form-min" placeholder="password" v-model="password">
+                </li>
+              </ul>
+              <div>
+                <ul class="m-box-inner-btn-para">
+                  <li>
+                    <button type="button" class="m-btn" v-on:click="signIn" v-bind:disabled="hasError">OK</button>
+                  </li>
+                </ul>
+                <ul class="m-box-inner-list">
+                  <li><a href="#" target="_new" v-on:click.stop.prevent="resetPassword">Forgot password</a></li>
+                </ul>
+              </div>
+            </form>
+          </div>
+        </div>
+        <!--//main-area-->
+      </div>
+
+    </div>
+
+    <!-- loading screen -->
+    <div class="loading-screen" v-show="loading">
+      <div><span class="icon-spinner"></span></div>
+    </div>
+
+  </div>
+  <script src="js/vendor/vue.min.js"></script>
+  <script src="js/vendor/jquery-2.2.4.min.js"></script>
+  <script src="js/vendor/jsbn.js"></script>
+  <script src="js/vendor/jsbn2.js"></script>
+  <script src="js/vendor/sjcl.js"></script>
+  <script src="js/vendor/aws-cognito-sdk.min.js"></script>
+  <script src="js/vendor/amazon-cognito-identity.min.js"></script>
+  <script src="js/cognito.js"></script>
+  <script src="../js/crypto-js/rollups/md5.js"></script>
+  <script src="../js/crypto-js/components/enc-base64-min.js"></script>
+  <script src="../js/hubea-r8533.js"></script>
+  <script src="js/hubea.delegate.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="description" content="hubea">
+  <link href="css/admin.css" rel="stylesheet">
+  <title>Account | Guardian TE</title>
+</head>
+<body>
+  <div id="app">
+
+    <header>
+      <nav class="m-navbar">
+        <div class="left-button icon-close" v-on:click="returnToApp"></div>
+        <span class="title">{{ user.username }}</span>
+      </nav>
+    </header>
+
+    <div id="l-wrapper">
+
+      <div class="m-page-main-wrap">
+        <!--main-area-->
+        <div class="m-box-main">
+          <h1 class="m-page-title">Account Settings</h1>
+           <div class="link-button">
+             <div class="link-button-content">
+              <a href="#" target="_new" v-on:click.stop.prevent="changeEmail" class="btn-link"></a>
+              <p class="link-button-h">Email</p>
+              <p>{{ user.email }}</p>
+              <p class="is-error" v-show="!user.email_verified">
+                 You need to confirm your e-mail change. Your e-mail will not be changed until you complete this step.
+              </p>
+              <div class="in-button"  v-show="!user.email_verified">
+                <a href="#" target="_new" v-on:click.stop.prevent="changeEmailReset" class="text-link"></a>
+                <p>Cancel this change and update email address</p>
+              </div>
+             </div>
+             <div class="link-button-arr">
+              {{ user.email_verified ? 'Edit' : 'Confirm' }}
+              <span class="icon-arr-r"></span>
+             </div>
+          </div>
+          <div class="link-button">
+            <div class="link-button-content">
+              <a href="#" target="_new" v-on:click.stop.prevent="changePassword" class="btn-link">Password</a>
+              <p class="link-button-h">Password</p>
+            </div>
+            <div class="link-button-arr">Edit<span class="icon-arr-r"></span></div>
+          </div>
+        </div>
+        <!--//main-area-->
+      </div>
+
+    </div>
+
+  </div>
+  <script src="js/vendor/vue.min.js"></script>
+  <script src="js/vendor/jquery-2.2.4.min.js"></script>
+  <script src="js/vendor/jsbn.js"></script>
+  <script src="js/vendor/jsbn2.js"></script>
+  <script src="js/vendor/sjcl.js"></script>
+  <script src="js/vendor/aws-cognito-sdk.min.js"></script>
+  <script src="js/vendor/amazon-cognito-identity.min.js"></script>
+  <script src="js/cognito.js"></script>
+  <script src="../js/hubea-r8533.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>
