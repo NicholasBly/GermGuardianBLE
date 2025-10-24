@@ -1,5 +1,8 @@
 ## A fully functional replacement to the GermGuardian iOS app for controlling your air purifier via bluetooth (BLE).
 
+<img width="150" height="327" alt="IMG_5275" src="https://github.com/user-attachments/assets/5fc75f52-93b6-4f6b-a52f-026cc8f01320" />
+<img width="150" height="327" alt="IMG_5276" src="https://github.com/user-attachments/assets/cb7109ba-8617-4e23-99d7-3a4c7ba147e6" />
+
 When the iOS app was discontinued, the app became useless because the web servers were shut down, leaving a white blank page. This led to the local bluetooth capability to be unavailable.
 
 Through decompilation of the app, bypassing the web server, and rewriting the template "control.html" file, the app is rebuilt!
