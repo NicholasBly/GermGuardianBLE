@@ -28,6 +28,7 @@ Steps taken:
 - Real time updates to all features, including particulate matter, speed, and active enabled options (same as original app)
 - All controls available to control before
 - HEPA Filter and UV-C bulb power on hours + life tracker
+- Device selector in settings tab if more than one air purifier is detected
 
 # Features Added
 1. Dark Mode Toggle
