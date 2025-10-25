@@ -542,6 +542,10 @@
     </div>
 
     <script>
+		const GUARDIAN_PRODUCT_CODES = [
+            '33A700D60A', 'EE7C07A00A', '0D15D3D004',
+            '03AD259009', '4DABB74601', 'E00DC04E01', '9136315208'
+        ];
         // Debug logging with types
         function debugLog(message, type = 'info') {
             console.log(message);
@@ -748,69 +752,73 @@
         function findDeviceDirectly() {
             updateStatus('Searching (Direct BLE)...');
             debugLog('Direct device search started...');
-            
-            // Known product codes for GermGuardian devices
-            const PRODUCT_CODES = [
-                '33A700D60A', 'EE7C07A00A', '0D15D3D004', 
-                '03AD259009', '4DABB74601', 'E00DC04E01', '9136315208'
-            ];
-            
+
+            // Uses the globally defined GUARDIAN_PRODUCT_CODES
+
             let attemptCount = 0;
             const maxAttempts = 15;
-            
+
             const searchAttempt = () => {
                 attemptCount++;
                 debugLog('Direct search attempt ' + attemptCount + '/' + maxAttempts);
-                
+
                 try {
-                    // Try to find any nearby JM1 devices
                     if (typeof hubea !== 'undefined' && hubea.jm1) {
                         hubea.jm1.getNearbyJm1s({
                             types: [93240, 82567] // JM1 types for Guardian devices
                         }, function(jm1s) {
-                            debugLog('Found ' + jm1s.length + ' JM1 device(s)');
-                            
+                            debugLog('Found ' + jm1s.length + ' raw JM1 device(s)');
+
                             if (jm1s && jm1s.length > 0) {
-                                // Filter for Guardian devices
-                                const guardianDevices = jm1s.filter(jm1 => {
-                                    return jm1.productCode && PRODUCT_CODES.includes(jm1.productCode);
+                                // **** MORE ROBUST FILTERING ****
+                                const validGuardianDevices = jm1s.filter(jm1 => {
+                                    // Ensure productCode exists AND is in our known list
+                                    return jm1.productCode && GUARDIAN_PRODUCT_CODES.includes(jm1.productCode);
                                 });
-                                
-                                debugLog('Found ' + guardianDevices.length + ' Guardian device(s)');
-                                
-                                if (guardianDevices.length > 0) {
-                                    const jm1 = guardianDevices[0];
-                                    debugLog('Using device: ' + jm1.productCode);
-                                    
+
+                                debugLog('Found ' + validGuardianDevices.length + ' valid Guardian device(s) via direct scan.');
+
+                                if (validGuardianDevices.length > 0) {
+                                    // Prefer devices with a higher RSSI (stronger signal = closer) if multiple valid ones are found
+                                    validGuardianDevices.sort((a, b) => (b.rssi || -100) - (a.rssi || -100));
+                                    const bestDeviceJm1 = validGuardianDevices[0];
+
+                                    logSuccess('Selecting device: ' + bestDeviceJm1.productCode + ' with ID ' + (bestDeviceJm1.jm1UniqId || '(from UUID)') + ', RSSI: ' + (bestDeviceJm1.rssi || 'N/A'));
+
                                     // Create Purifier device manually
-                                    targetDevice = new Purifier(guardian, jm1);
-                                    connectToDevice();
+                                    // Ensure guardian object exists even if setup failed
+                                    if (!guardian) {
+                                         guardian = new Guardian({ debug: 3, serverType: 'l' });
+                                    }
+                                    targetDevice = new Purifier(guardian, bestDeviceJm1);
+                                    connectToDevice(); // Proceed to connect
+
                                 } else if (attemptCount < maxAttempts) {
                                     setTimeout(searchAttempt, 2000);
                                 } else {
-                                    showError('No GermGuardian devices found. Make sure it\'s powered on and nearby.');
+                                    showError('No valid GermGuardian devices found. Make sure it\'s powered on and nearby.');
                                     document.getElementById('retryBtn').style.display = 'block';
                                 }
                             } else if (attemptCount < maxAttempts) {
                                 setTimeout(searchAttempt, 2000);
                             } else {
-                                showError('No Bluetooth devices detected. Check Bluetooth permissions.');
+                                showError('No Bluetooth devices detected. Check Bluetooth permissions and ensure device is discoverable.');
                                 document.getElementById('retryBtn').style.display = 'block';
                             }
                         }, function(error) {
-                            debugLog('JM1 search error: ' + JSON.stringify(error));
+                            logError('JM1 direct search error: ' + JSON.stringify(error));
                             if (attemptCount < maxAttempts) {
                                 setTimeout(searchAttempt, 2000);
                             } else {
-                                showError('Bluetooth search failed. Please grant Bluetooth permissions.');
+                                showError('Bluetooth search failed repeatedly. Please check permissions and device.');
                                 document.getElementById('retryBtn').style.display = 'block';
                             }
                         });
                     } else {
-                        throw new Error('Hubea BLE not available');
+                        throw new Error('Hubea BLE library not available');
                     }
                 } catch (error) {
-                    debugLog('Search attempt error: ' + error.message);
+                    logError('Direct search attempt exception: ' + error.message);
                     if (attemptCount < maxAttempts) {
                         setTimeout(searchAttempt, 2000);
                     } else {
@@ -819,67 +827,89 @@
                     }
                 }
             };
-            
+
             searchAttempt();
         }
 
         function findDevice() {
             updateStatus('Searching...');
-            debugLog('Searching for devices...');
-            
+            debugLog('Searching for devices using Guardian library...');
+
+            // Uses the globally defined GUARDIAN_PRODUCT_CODES
+
             let attemptCount = 0;
             const maxAttempts = 10;
-            
+
             const searchAttempt = () => {
                 attemptCount++;
-                debugLog('Search attempt ' + attemptCount + '/' + maxAttempts);
-                
+                debugLog('Guardian search attempt ' + attemptCount + '/' + maxAttempts);
+
                 if (!guardian || !guardian.findDevices) {
-                    debugLog('Guardian not properly initialized, trying direct method...');
-                    findDeviceDirectly();
+                    logWarning('Guardian library not ready or findDevices unavailable, falling back to direct BLE scan...');
+                    findDeviceDirectly(); // Fallback immediately if guardian method isn't ready
                     return;
                 }
-                
+
                 try {
+                    // Note: guardian.findDevices internally might already use product codes,
+                    // but we add an explicit filter on the results for safety.
                     guardian.findDevices(
                         function(devices) {
-                            debugLog('Found ' + devices.length + ' device(s)');
-                            
+                            debugLog('Guardian found ' + devices.length + ' potential device(s)');
+
                             if (devices && devices.length > 0) {
-                                targetDevice = devices[0];
-                                debugLog('Using device: ' + targetDevice.getUniqueId());
-								
-                            // Check for localKey
-							if (targetDevice.localKey) {
-								logSuccess('Local key found for device. Proceeding to connect.');
-								connectToDevice();
-							} else {
-								logWarning('Local key NOT found. Initiating pairing...');
-								updateStatus('Pairing Required...');
-								// You might need a UI element (e.g., a "Pair" button) here
-								// For now, let's try auto-pairing
-								initiatePairing();
-							}
+                                // **** FILTER RESULTS BASED ON PRODUCT CODE ****
+                                const validGuardianDevices = devices.filter(device => {
+                                    // Access the underlying jm1 data which should have productCode
+                                    return device.jm1 && device.jm1.productCode && GUARDIAN_PRODUCT_CODES.includes(device.jm1.productCode);
+                                });
+
+                                debugLog('Found ' + validGuardianDevices.length + ' valid Guardian device(s) via library.');
+
+                                if (validGuardianDevices.length > 0) {
+                                    // Prefer stronger signal if multiple valid ones are found
+                                    validGuardianDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                    targetDevice = validGuardianDevices[0]; // Select the best valid device
+
+                                    logSuccess('Selecting device: ' + targetDevice.jm1.productCode + ' with ID ' + targetDevice.getUniqueId() + ', RSSI: ' + (targetDevice.jm1.rssi || 'N/A'));
+
+                                    // **** Check for localKey ****
+                                    if (targetDevice.localKey) {
+                                        logSuccess('Local key found for device. Proceeding to connect.');
+                                        connectToDevice();
+                                    } else {
+                                        logWarning('Local key NOT found. Initiating pairing...');
+                                        updateStatus('Pairing Required...');
+                                        initiatePairing();
+                                    }
+                                } else if (attemptCount < maxAttempts) {
+                                     // No *valid* devices found yet, retry search
+                                    setTimeout(searchAttempt, 2000);
+                                } else {
+                                    logWarning('Standard Guardian search failed to find a valid device, trying direct BLE scan...');
+                                    findDeviceDirectly(); // Fallback if no valid device found after retries
+                                }
                             } else if (attemptCount < maxAttempts) {
+                                 // No devices found at all, retry search
                                 setTimeout(searchAttempt, 2000);
                             } else {
-                                debugLog('Standard search failed, trying direct...');
-                                findDeviceDirectly();
+                                logWarning('Standard Guardian search failed, trying direct BLE scan...');
+                                findDeviceDirectly(); // Fallback if no devices found after retries
                             }
                         },
                         function(error) {
-                            debugLog('Find error: ' + JSON.stringify(error));
+                            logError('Guardian findDevices error: ' + JSON.stringify(error));
                             if (attemptCount < maxAttempts) {
                                 setTimeout(searchAttempt, 2000);
                             } else {
-                                debugLog('Standard search failed, trying direct...');
-                                findDeviceDirectly();
+                                logWarning('Standard Guardian search failed repeatedly, trying direct BLE scan...');
+                                findDeviceDirectly(); // Fallback on repeated errors
                             }
                         }
                     );
                 } catch (error) {
-                    debugLog('Search exception: ' + error.message);
-                    findDeviceDirectly();
+                    logError('Guardian search exception: ' + error.message);
+                    findDeviceDirectly(); // Fallback on exception
                 }
             };
 
