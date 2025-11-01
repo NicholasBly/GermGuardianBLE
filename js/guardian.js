@@ -134,55 +134,90 @@
    */
   Guardian.prototype.setup = function(success, fail) {
     var self = this;
+    self.debug('Guardian.setup() initiated...'); // START
 
-    // hubea.js初期化待ち
+    // hubea.js initialization waiting
+    self.debug('STEP 1: Waiting for $._hubeaReady()...');
     $._hubeaReady().then(function() {
-      // hubea情報取得
+      self.debug('STEP 1: $._hubeaReady() COMPLETED.');
+
+      // get hubea info
+      self.debug('STEP 2: Calling $._getSystemInfo()...');
       return $._getSystemInfo();
     }).then(function(info) {
+      self.debug('STEP 2: $._getSystemInfo() COMPLETED.');
       self.__systemInfo = info || {};
       if (!self.__systemInfo.isOnHubea) {
-        // 無応答になるためskip
-        return;
+        self.warn('! Hubea native bridge not detected (isOnHubea=false). Skipping subsequent native calls.');
+        // This might be the root cause. If it's false, the chain continues but...
       }
-      // userAgent情報取得
+      
+      // get userAgent info
+      self.debug('STEP 3: Calling $._getHubeaUserAgent()...');
+      if (!self.__systemInfo.isOnHubea) return ''; // Manually skip if bridge is down
       return $._getHubeaUserAgent();
     }).then(function(ua) {
+      self.debug('STEP 3: $._getHubeaUserAgent() COMPLETED.');
       self.__userAgent = ua || {};
-      if (!self.__systemInfo.isOnHubea) {
-        // 無応答になるためskip
-        return '';
-      }
-      // installId取得
+      
+      // get installId
+      self.debug('STEP 4: Calling $._getInstallId()...');
+      if (!self.__systemInfo.isOnHubea) return ''; // Manually skip if bridge is down
       return $._getInstallId();
+	// --- PATCHED 10.31.2025 ---
     }).then(function(installId) {
-      self.__installId = installId;
-      // localStorage上のlogin状態の読み出し
+      self.debug('STEP 4: $._getInstallId() COMPLETED.');
+      self.__installId = installId; // This will be null if it timed out
+
+      // Read login status on localStorage
+      self.debug('STEP 5: Calling self._loadLoginState()...');
       return self._loadLoginState();
-    }).then(function() {
+	}).then(function() {
+      self.debug('STEP 5: self._loadLoginState() COMPLETED.');
       if (self.isLoggedIn()) {
+        self.debug('User is logged in. Checking installId...');
         var account = self.__loginAccount;
         if (account.hasOwnProperty('installId')) {
-          // installIdが変更された場合はSession情報と登録機器情報は破棄する
+          
+          // --- PATCH START ---
+          // If installId is null (timed out), we MUST reuse the stored ID
+          // to prevent a mismatch that would wipe the user's keys.
+          if (!self.__installId) {
+            self.warn('Native installId timed out. Reusing stored installId: ' + account.installId);
+            self.__installId = account.installId; // Restore it from the account
+          }
+          // --- PATCH END ---
+
           if (account.installId !== self.__installId) {
+            self.warn('! installId mismatch. Clearing account and device data.');
             self.__loginAccount = {};
             return $._storageRemove(SKEY_LOCALKEY);
           }
-        } else {
-          // installId自体が保存されていない場合は現在のinstallIdを保存しておく
+
+        } else if (self.__installId) { // Only store if we got a valid one
+          self.debug('Saving current installId to account info.');
           self._storeLoginState();
+        } else {
+          self.warn('No installId to save to account info (native call timed out and no stored ID found).');
         }
+      } else {
+        self.debug('User is not logged in (guest).');
       }
-      // localStorage上のlocalKey読み出し
+
+      // Read localKey on localStorage
+      self.debug('STEP 6: Calling self._loadDeviceData()...');
       return self._loadDeviceData();
     }).done(function() {
-      self._callback(success);
+      self.debug('STEP 6: self._loadDeviceData() COMPLETED.');
+      self.debug('Guardian.setup() SUCCESS. Calling success callback.');
+      self._callback(success); // This is the success callback
     }).fail(function(err, data) {
+      self.error('Guardian.setup() FAILED.');
       if (!err) {
         err = Guardian.ErrorTypes.UNKNOWN;
       }
       self.error(err);
-      self._callback(fail, [err, data]);
+      self._callback(fail, [err, data]); // This is the fail callback
     });
   }
 
@@ -205,16 +240,23 @@
       //self.debug('jm1s:', jm1s);
       for (var i = 0; i < jm1s.length; i++) {
         var jm1 = jm1s[i];
-        // productCodeの得られないデバイス または serviceUuid，jm1UniqId両方共得られないデバイスは除外する
-        if (!jm1.productCode || (!jm1.serviceUuid && !jm1.jm1UniqId)) {
+        
+        // --- PATCH: Removed !jm1.productCode check ---
+        if (!jm1.serviceUuid && !jm1.jm1UniqId) {
+          self.warn('guardian.findDevice: Device filtered out: No serviceUuid or jm1UniqId.');
           continue;
         }
+        
         // uniqueIdが一致しないデバイスは除外する
         var nearbyUniqId = jm1.jm1UniqId || uniqueIdFromUuid(jm1.serviceUuid);
         if (nearbyUniqId != uniqueId) {
-          console.warn('nearbyUniqId unmatch:' + nearbyUniqId + ' to ' + uniqueId);
+          self.warn('guardian.findDevice: nearbyUniqId unmatch: ' + nearbyUniqId + ' to ' + uniqueId);
           continue;
         }
+        
+        // --- If we are here, we found a match ---
+        self.debug('guardian.findDevice: Matched device with uniqueId: ' + uniqueId);
+
         var device = self._findCachedDevice(uniqueId);
         if (device) {
           device.deviceHandle = null; // deviceHandleは更新されたjm1情報から取り直す
@@ -235,10 +277,16 @@
         foundDevice = jm1UniqueFilter(uniqueId, jm1s);
         if (foundDevice) {
           // この時点ではdeviceId, product nameは分かっていないためattachする
+          self.debug('guardian.findDevice: Found device, attaching info...');
           return self._attachDeviceInfo(foundDevice, false);
         }
       })
       .done(function() {
+        if (foundDevice) {
+            self.debug('guardian.findDevice: Device attach complete.');
+        } else {
+            self.warn('guardian.findDevice: Could not find device with id ' + uniqueId);
+        }
         // 該当無しの場合はundefinedのまま返却
         self._callback(success, foundDevice);
       })
@@ -268,16 +316,26 @@
     var devices = [];
     var $queries = [];
     var jm1Filter = function(jm1s) {
+      // --- START OF ADDED LOGGING ---
+      self.debug('guardian.findDevices: Found ' + jm1s.length + ' raw JM1 device(s)');
+      jm1s.forEach(function(jm1, i) {
+          self.debug('guardian.findDevices: Checking device ' + i + ': productCode=' + jm1.productCode + ', serviceUuid=' + jm1.serviceUuid);
+      });
+      // --- END OF ADDED LOGGING ---
+
       jm1s.forEach(function(jm1, i) {
         // productCodeの得られないデバイスは除外する
+        // --- PATCH: Removed !jm1.productCode check ---
         if (!jm1.productCode) {
-          return;
+            self.warn('guardian.findDevices: Device ' + i + ' has no productCode. Proceeding anyway.');
+            // We no longer 'return' here
         }
         var uniqueId;
         // serviceUuid，jm1UniqId両方共得られないデバイスは除外する
         if (!jm1.serviceUuid) {
           if (!jm1.jm1UniqId) {
-            return;
+            self.debug('guardian.findDevices: Device ' + i + ' REJECTED. No serviceUuid or jm1UniqId.');
+            return; // This is a valid rejection
           }
           uniqueId = jm1.jm1UniqId;
         } else {
@@ -290,8 +348,11 @@
           device = self._createDevice(jm1);
         }
         if (device) {
+          self.debug('guardian.findDevices: Device ' + i + ' created successfully. Attaching info...');
           devices.push(device);
           $queries.push(self._attachDeviceInfo(device, false));
+        } else {
+           self.debug('guardian.findDevices: Device ' + i + ' FAILED _createDevice.');
         }
       });
     }
@@ -302,6 +363,7 @@
         return $.when.apply($, $queries);
       })
       .done(function() {
+        self.debug('guardian.findDevices: Attaching info complete. Returning ' + devices.length + ' devices.');
         self._callback(success, [devices]);
       })
       .fail(function(err, data) {
@@ -741,10 +803,29 @@
     this._initLog(opts.debug);
   }
 
+// --- PATCHED 10.31.2025 ---
   Guardian.prototype._createDevice = function(jm1) {
     var matchTypes = Guardian.DeviceModels.filter(function(deviceModel) {
       return (typeof window[deviceModel.model] == 'function' && deviceModel.productCodes &&  0 <= deviceModel.productCodes.indexOf(jm1.productCode));
     });
+
+    // --- PATCH START ---
+    // If no match (e.g., productCode is undefined), but we are in the
+    // context of this app, we can assume it's a Purifier.
+    if (matchTypes.length === 0 && typeof window.Purifier == 'function') {
+      this.warn('No productCode match. Assuming Purifier.');
+      var device = new window.Purifier(this, jm1);
+      // Manually find the Purifier jm1Type from DeviceModels
+      var purifierModel = Guardian.DeviceModels.find(m => m.model === 'Purifier');
+      if (purifierModel) {
+          device.jm1Type = purifierModel.jm1Type; // Should be 93240
+      } else {
+          device.jm1Type = 93240; // Hardcode as fallback
+      }
+      return device;
+    }
+    // --- PATCH END ---
+
     if (0 < matchTypes.length) {
       var device = new window[matchTypes[0].model](this, jm1);
       device.jm1Type = matchTypes[0].jm1Type;
@@ -772,28 +853,43 @@
       return;
     }
     // デバイスIDが無ければ取得
-    var $d;
-    if (!device.deviceId) {
-      $d = $._getDevice(args).then(null, function() {
-        if (args.deviceHandle) {
-          self.debug('_attachDeviceInfo unexpected device handle.');
-          return $.Deferred().resolve().promise();
-        }
-      });
-    } else {
-      $d = $.Deferred().resolve(device.deviceId);
-    }
-    $d.then(function(deviceId) {
-      self.debug('_attachDeviceInfo deviceId=' + deviceId);
-      if (deviceId) {
-        device.deviceId = deviceId;
-        // デバイスハンドルが無ければ取得
-        if (!device.deviceHandle) {
-          return $._getDeviceHandle({deviceId: deviceId});
-        }
+      var $d;
+      if (!device.deviceId) {
+        // --- PATCH START ---
+        // Try to get deviceId, but if it fails (times out),
+        // fall back to using the serviceUuid as the deviceId.
+        $d = $._getDevice(args).then(
+          function(id) { return id; }, // Success
+          function(err) { // Failure (timeout)
+            self.warn('$._getDevice failed. Using serviceUuid as deviceId fallback.');
+            return args.serviceUuid; // FALLBACK
+          }
+        );
+        // --- END PATCH ---
+      } else {
+        $d = $.Deferred().resolve(device.deviceId);
       }
-      return device.deviceHandle;
-    }).then(function(deviceHandle) {
+      $d.then(function(deviceId) {
+        self.debug('_attachDeviceInfo deviceId=' + deviceId);
+        if (deviceId) {
+          device.deviceId = deviceId;
+          // デバイスハンドルが無ければ取得
+          if (!device.deviceHandle) {
+            // --- PATCH START ---
+            // Try to get handle, but if it fails,
+            // fall back to using the deviceId (which is now our serviceUuid) as the handle.
+            return $._getDeviceHandle({deviceId: deviceId}).then(
+              function(handle) { return handle; }, // Success
+              function(err) { // Failure (timeout)
+                self.warn('$._getDeviceHandle failed. Using deviceId as handle fallback.');
+                return deviceId; // FALLBACK
+              }
+            );
+            // --- END PATCH ---
+          }
+        }
+        return device.deviceHandle;
+      }).then(function(deviceHandle) {
       if (deviceHandle != -1) {
         self.debug('_attachDeviceInfo deviceHandle=' + deviceHandle);
         device.deviceHandle = deviceHandle;
@@ -895,7 +991,7 @@
       }
       self.__localKeyMap  = {};
       self.__cachedDevices = {};
-      return $._rejectAction();
+      return $._resolveAction(); // <-- THIS IS THE FIX
     };
 
     return $.Deferred(function($dfd) {
@@ -2652,7 +2748,7 @@
    * 実行端末が変わる等して、復元されたDevice Handle値の互換性が失われた場合はDevice IDが無い状態になる
    * そのような場合は周辺検索からやり直して再取得し直す
    */
-  Guardian.Device.prototype._ensureDeviceId = function() {
+	Guardian.Device.prototype._ensureDeviceId = function() {
     var self = this;
     var guardian = this.guardian;
     return $.Deferred(function($dfd) {
@@ -2660,30 +2756,52 @@
         $dfd.resolve();
         return;
       }
-      $.hubea.util.repeat(500, function(handle, times) {
-        if (10 < times) {
+
+      let attemptCount = 0;
+      const maxAttempts = 10; // 10 attempts * 500ms = 5 seconds
+      let intervalId = null;
+
+      const attemptFind = function() {
+        if (attemptCount++ > maxAttempts) {
           self.error('_ensureDeviceId timeout.');
-          handle.fail();
+          clearInterval(intervalId);
+          $dfd.reject(new Error('_ensureDeviceId timeout'));
           return;
         }
-        guardian.findDevice(self.getUniqueId(), function(device) {
-          if (device) {
-            handle.stop(device);
+
+        self.debug('ensureDeviceId attempt ' + attemptCount);
+        
+        // Call findDevice, which is async
+        guardian.findDevice(self.getUniqueId(), 
+          function(device) { // SUCCESS callback
+            if (device) {
+              // We found it. Stop the loop.
+              clearInterval(intervalId);
+              
+              if (device.deviceId && device.deviceHandle) {
+                self.debug('ensureDeviceId SUCCESS');
+                self.deviceId = device.deviceId;
+                self.deviceHandle = device.deviceHandle;
+                guardian._storeDeviceCache(self)
+                  .done(function() { $dfd.resolve(); })
+                  .fail(function() { $dfd.reject(new Error('storeDeviceCache failed')); });
+              } else {
+                self.error('_ensureDeviceId unexpected device state:' + JSON.stringify(device));
+                $dfd.reject(new Error('Device found but handle is missing'));
+              }
+            }
+            // If device is null, the loop will just continue
+          },
+          function(err) { // FAILURE callback
+            self.error('ensureDeviceId findDevice error: ' + (err ? err.message : 'unknown'));
+            // Loop will continue
           }
-        });
-      }).then(function(device) {
-        if (device.deviceId && device.deviceHandle) {
-          self.deviceId = device.deviceId;
-          self.deviceHandle = device.deviceHandle;
-          return guardian._storeDeviceCache(self);
-        }
-        self.error('_ensureDeviceId unexpected device:' + JSON.stringify(device));
-        return $._rejectAction();
-      }).done(function() {
-        $dfd.resolve();
-      }).fail(function() {
-        $dfd.reject();
-      });
+        );
+      };
+
+      intervalId = setInterval(attemptFind, 500); // Poll every 500ms
+      attemptFind(); // Run the first attempt immediately
+
     });
   }
 
@@ -3719,6 +3837,10 @@
         }
       }
     }
+	if (Object.keys(result).length === 0) {
+              self.warn('_parseDeviceSettingReport: No valid data found in response.');
+              return null;
+          }
     return result;
   }
 
@@ -4551,14 +4673,25 @@
     });
   }
 
+// --- PATCHED 10.31.2025 ---
   $._getInstallId = function() {
     return $.Deferred(function($dfd) {
+      
+      // Add a 5-second timeout.
+      const installIdTimeout = setTimeout(() => {
+          console.warn('$._getInstallId() timed out. Continuing without native installId.');
+          $dfd.resolve(null); // Resolve with null instead of hanging
+      }, 5000); 
+
       try {
         hubea.app.getInstallId(function(id) {
+          clearTimeout(installIdTimeout); // Success! Clear the timeout.
           $dfd.resolve(id);
         });
       } catch (e) {
-        return $dfd.reject(e);
+        clearTimeout(installIdTimeout); // Error! Clear the timeout.
+        console.error('Error in $._getInstallId catch: ' + e.message);
+        $dfd.reject(e);
       }
     });
   }
@@ -4631,42 +4764,65 @@
     });
   }
 
-  $._getDevice = function(args) {
-    return $.Deferred(function($dfd) {
-      if (!args || Object.keys(args).length <= 0) {
-        $dfd.resolve(-1);
-      }
-      try {
-        hubea.jm1.getDevice(args,
-          function(result) {
-            $dfd.resolve(result.deviceId);
-          },
-          function() {
-            $dfd.reject();
-          }
-        );
-      } catch (e) {
-        $dfd.reject(e);
-      }
-    });
-  }
+	$._getDevice = function(args) {
+		return $.Deferred(function($dfd) {
+		  if (!args || Object.keys(args).length <= 0) {
+			$dfd.resolve(-1);
+			return; // Added return
+		  }
 
-  $._getDeviceHandle = function(args) {
-    return $.Deferred(function($dfd) {
-      try {
-        hubea.jm1.device.getHandle(args,
-          function(result) {
-            $dfd.resolve(result.deviceHandle);
-          },
-          function() {
-            $dfd.reject();
-          }
-        );
-      } catch (e) {
-        $dfd.reject(e);
-      }
-    });
-  }
+		  // Add a 3-second timeout.
+		  const getDeviceTimeout = setTimeout(() => {
+			  console.warn('$._getDevice() timed out. Rejecting.');
+			  $dfd.reject(new Error('$._getDevice timeout')); // Reject on timeout
+		  }, 3000);
+
+		  try {
+			hubea.jm1.getDevice(args,
+			  function(result) {
+				clearTimeout(getDeviceTimeout); // Success!
+				$dfd.resolve(result.deviceId);
+			  },
+			  function(err) { // Pass error through
+				clearTimeout(getDeviceTimeout);
+				console.warn('$._getDevice() native call failed.');
+				$dfd.reject(err);
+			  }
+			);
+		  } catch (e) {
+			clearTimeout(getDeviceTimeout);
+			$dfd.reject(e);
+		  }
+		});
+	  }
+
+	$._getDeviceHandle = function(args) {
+		return $.Deferred(function($dfd) {
+
+		  // Add a 3-second timeout.
+		  const getHandleTimeout = setTimeout(() => {
+			  console.warn('$._getDeviceHandle() timed out. Rejecting.');
+			  $dfd.reject(new Error('$._getDeviceHandle timeout')); // Reject on timeout
+		  }, 3000);
+		  
+		  try {
+			hubea.jm1.device.getHandle(args,
+			  function(result) {
+				clearTimeout(getHandleTimeout); // Success!
+				$dfd.resolve(result.deviceHandle);
+			  },
+			  function(err) { // Pass error through
+				clearTimeout(getHandleTimeout);
+				console.warn('$._getDeviceHandle() native call failed.');
+				$dfd.reject(err);
+			  }
+			);
+		  } catch (e) {
+			clearTimeout(getHandleTimeout);
+			$dfd.reject(e);
+		  }
+		});
+	  }
 
   $._releaseDevice = function(args) {
     return $.Deferred(function($dfd) {
@@ -5130,6 +5286,7 @@
     return "";
   }
 
+// --- PATCHED 10.31.2025 ---
   function decode(src) {
     // base64デコードし、jsonを取り出す(後方互換のためデコード失敗しても継続)
     try {
@@ -5138,6 +5295,11 @@
       console.error('src[' + src + ']', e);
     }
     try {
+      // --- ADD THIS CHECK ---
+      if (src === "") {
+          return null;
+      }
+      // --- END OF CHECK ---
       return JSON.parse(src);
     } catch(e) {
       console.error('src[' + src + ']', e);
