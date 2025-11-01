@@ -416,7 +416,9 @@
 
         .debug-console p {
             margin: 2px 0;
+            font-size: 11px;
             word-wrap: break-word;
+            white-space: pre-wrap;
         }
 
         .debug-console p.error {
@@ -712,6 +714,7 @@
         <button class="retry-btn hidden" id="retryBtn" onclick="retryConnection()">Retry Connection</button>
         <p class="error-message hidden" id="errorMessage"></p>
         <div class="debug-console" id="debugInfo"></div>
+		<button class="retry-btn" id="copyLogBtn" style="margin-top: 10px; background: #555; width: 80%; margin-left: 10%;" onclick="copyLogToClipboard()">Copy Log</button>
     </div>
 
     <!-- Main App -->
@@ -905,16 +908,37 @@
 					<input type="checkbox" class="toggle" id="darkModeToggle">
 				</div>
 				
-				<div class="control-item" style="border: none;">
-					<div class="control-item-left">
-						<div class="control-icon">⚫</div>
-						<div class="control-label">AMOLED Mode</div>
-					</div>
-					<input type="checkbox" class="toggle" id="amoledModeToggle">
+			<div class="control-item" style="border: none; padding-bottom: 18px;">
+				<div class="control-item-left">
+					<div class="control-icon">⚫</div>
+					<div class="control-label">AMOLED Mode</div>
 				</div>
-				
-				<!-- Debug Console -->
-				<div class="debug-console" id="debugInfo2" style="margin: 15px 0 0 0;"></div>
+				<input type="checkbox" class="toggle" id="amoledModeToggle">
+			</div>
+
+			<div class="control-item" style="border: none;">
+				<div class="control-item-left">
+					<div class="control-icon">⚡</div>
+					<div class="control-label">Polling Rate</div>
+				</div>
+				<select class="timer-select" id="pollingRateSelect">
+					<option value="3000">3 seconds</option>
+					<option value="5000">5 seconds</option>
+					<option value="7000">7 seconds</option>
+					<option value="10000" selected>10 seconds</option>
+				</select>
+			</div>
+			<div class="control-item" style="border: none; padding-top: 18px;">
+                <div class="control-item-left">
+                    <div class="control-icon">🔑</div>
+                    <div class="control-label">Device LocalKey</div>
+                </div>
+                <button class="timer-select" id="showKeyBtn" style="width: auto; padding: 8px 15px;">Show & Copy</button>
+            </div>
+            <div class="debug-console" id="debugInfo2" style="margin: 15px 0 0 0;"></div>
+
+			<!-- Debug Console -->
+			<div class="debug-console" id="debugInfo2" style="margin: 15px 0 0 0;"></div>
 			</div>
         </div>
     </div>
@@ -929,11 +953,20 @@
         let targetDevice = null;
         let allDiscoveredDevices = [];
         let statusRefreshInterval = null;
-        const REFRESH_INTERVAL = 10000;
+        let REFRESH_INTERVAL = 10000;
 
+
+		const originalConsole = {
+            log: console.log.bind(console),
+            error: console.error.bind(console),
+            warn: console.warn.bind(console),
+            info: console.info.bind(console),
+            debug: console.debug.bind(console),
+            trace: console.trace.bind(console)
+        };
         // --- Logging ---
         function debugLog(message, type = 'info') {
-            console.log(message);
+            originalConsole.log(message);
             const debugDiv1 = document.getElementById('debugInfo');
             const debugDiv2 = document.getElementById('debugInfo2');
             const p = document.createElement('p');
@@ -946,9 +979,60 @@
         function logError(message) { debugLog('❌ ' + message, 'error'); }
         function logSuccess(message) { debugLog('✅ ' + message, 'success'); }
         function logWarning(message) { debugLog('⚠️ ' + message, 'warning'); }
+		
+		// Helper function to format all arguments (like objects) for the HTML log
+        function formatLogArguments(argsArray) {
+            return argsArray.map(arg => {
+                if (typeof arg === 'object' && arg !== null) {
+                    try {
+                        // Stringify objects so they appear as text, not [object Object]
+                        return JSON.stringify(arg);
+                    } catch (e) {
+                        return '[Unserializable Object]';
+                    }
+                }
+                return String(arg); // Convert all other types to string
+            }).join(' '); // Join multiple arguments with a space
+        }
+
+        // --- Redirect global console to our debugLog ---
+        // Now, any call to console.log() (from guardian.js or anywhere else)
+        // will also be sent to your HTML debug console.
+
+        console.log = function() {
+            originalConsole.log.apply(console, arguments); // Keep original behavior
+            debugLog(formatLogArguments(Array.from(arguments)), 'info'); // Send to HTML
+        };
+        
+        console.info = function() {
+            originalConsole.info.apply(console, arguments);
+            debugLog(formatLogArguments(Array.from(arguments)), 'info');
+        };
+        
+        console.warn = function() {
+            originalConsole.warn.apply(console, arguments);
+            // Use your existing logWarning function
+            logWarning(formatLogArguments(Array.from(arguments)));
+        };
+        
+        console.error = function() {
+            originalConsole.error.apply(console, arguments);
+            // Use your existing logError function
+            logError(formatLogArguments(Array.from(arguments)));
+        };
+        
+        console.debug = function() {
+            originalConsole.debug.apply(console, arguments);
+            debugLog(formatLogArguments(Array.from(arguments)), 'info'); // Or a 'debug' type
+        };
+
+        console.trace = function() {
+            originalConsole.trace.apply(console, arguments);
+            debugLog(formatLogArguments(Array.from(arguments)), 'info');
+        };
 
         // --- Script Loading ---
-        const possiblePaths = ['','../js/','../../js/','../../../js/','/js/','/air/contents/product/js/','/air/contents/dev/js/'];
+        const possiblePaths = ['../js/','','../../js/','../../../js/','/js/','/air/contents/product/js/','/air/contents/dev/js/'];
         const requiredScripts = [
             { name: 'jquery', file: 'jquery-2.1.4.min.js', test: () => typeof jQuery !== 'undefined' },
             { name: 'hubea', file: 'hubea-r8533.js', test: () => typeof hubea !== 'undefined' },
@@ -974,32 +1058,65 @@
             }
         });
 
-        async function initializeApp() {
-            try {
-                debugLog('Initializing Guardian...');
-                const serverTypes = ['p', 'l', 'd', 's'];
-                let initialized = false;
-                for (const serverType of serverTypes) {
-                    try {
-                        debugLog('Trying server type: ' + serverType);
-                        guardian = new Guardian({ debug: 3, serverType: serverType });
-                        await new Promise((resolve, reject) => {
-                            const timeout = setTimeout(() => reject(new Error('Setup timeout')), 5000);
-                            guardian.setup(() => { clearTimeout(timeout); resolve(); }, (err) => { clearTimeout(timeout); reject(new Error('Setup failed: ' + err)); });
-                        });
-                        logSuccess('Guardian initialized with server type: ' + serverType);
-                        initialized = true;
-                        break;
-                    } catch (err) { logWarning('Failed with ' + serverType + ': ' + err.message); }
+		async function initializeApp() {
+			try {
+				debugLog('Initializing Guardian...');
+				debugLog('jQuery loaded: ' + (typeof jQuery !== 'undefined'));
+				debugLog('hubea loaded: ' + (typeof hubea !== 'undefined'));
+				debugLog('ASPE loaded: ' + (typeof ASPE !== 'undefined'));
+				debugLog('Guardian loaded: ' + (typeof Guardian !== 'undefined'));
+				if (typeof hubea !== 'undefined' && hubea.event) {
+                    hubea.event.bind('onResume', resumeAppConnections);
+                    logSuccess('✅ onResume listener attached.');
+                } else {
+                    logWarning('hubea.event.bind not available. App resume may not work.');
                 }
-                if (!initialized) throw new Error('Could not initialize with any server type');
-                findDevice();
-            } catch (error) {
-                logError('Init error: ' + error.message);
-                logWarning('Attempting direct BLE connection...');
-                tryDirectConnection();
-            }
-        }
+				const serverTypes = ['l', 'p', 'd', 's'];
+				let initialized = false;
+				
+				for (const serverType of serverTypes) {
+					try {
+						debugLog('Trying server type: ' + serverType);
+						guardian = new Guardian({ 
+							debug: 5,  // Use maximum logging to see what's happening
+							serverType: serverType 
+						});
+						
+						// Give it more time - 15 seconds instead of 5
+						await new Promise((resolve, reject) => {
+							const timeout = setTimeout(() => {
+								reject(new Error('Setup timeout after 15 seconds'));
+							}, 15000);
+							
+							guardian.setup(
+								() => { 
+									clearTimeout(timeout); 
+									resolve(); 
+								}, 
+								(err) => { 
+									clearTimeout(timeout); 
+									reject(new Error('Setup failed: ' + JSON.stringify(err))); 
+								}
+							);
+						});
+						
+						logSuccess('Guardian initialized with server type: ' + serverType);
+						initialized = true;
+						break;
+					} catch (err) { 
+						logWarning('Failed with ' + serverType + ': ' + err.message); 
+					}
+				}
+				
+				if (!initialized) throw new Error('Could not initialize with any server type');
+				
+				findDevice();
+			} catch (error) {
+				logError('Init error: ' + error.message);
+				logWarning('Attempting direct BLE connection...');
+				tryDirectConnection();
+			}
+		}
 
         async function tryDirectConnection() {
             try { debugLog('Using direct BLE approach...'); guardian = new Guardian({ debug: 3, serverType: 'l' }); setTimeout(() => { debugLog('Starting direct device search...'); findDeviceDirectly(); }, 1000); } catch (error) { logError('Direct connection failed: ' + error.message); showError('Unable to connect. Please check Bluetooth is enabled.'); document.getElementById('retryBtn').classList.remove('hidden'); }
@@ -1024,17 +1141,63 @@
                     if (typeof hubea !== 'undefined' && hubea.jm1) {
                         hubea.jm1.getNearbyJm1s({ types: [93240, 82567] }, function(jm1s) {
                             debugLog('Found ' + jm1s.length + ' raw JM1 device(s)');
+                            
+                            // Log detailed information about each device
                             if (jm1s && jm1s.length > 0) {
-                                const validGuardianDevicesJm1s = jm1s.filter(jm1 => jm1.productCode && GUARDIAN_PRODUCT_CODES.includes(jm1.productCode));
+                                jm1s.forEach(function(jm1, index) {
+                                    console.log('=== Device ' + (index + 1) + ' Details ===');
+                                    console.log('serviceUuid:', jm1.serviceUuid);
+                                    console.log('productCode:', jm1.productCode);
+                                    console.log('productDesc:', jm1.productDesc);
+                                    console.log('rssi:', jm1.rssi);
+                                    console.log('jm1UniqId:', jm1.jm1UniqId);
+                                    console.log('All properties:', Object.keys(jm1));
+                                    console.log('Full object:', JSON.stringify(jm1));
+                                    debugLog('Device ' + (index + 1) + ': serviceUuid=' + jm1.serviceUuid + ', productCode=' + jm1.productCode + ', rssi=' + jm1.rssi);
+                                });
+                                
+                                const validGuardianDevicesJm1s = jm1s;
                                 debugLog('Found ' + validGuardianDevicesJm1s.length + ' valid Guardian device(s) via direct scan.');
+                                
+                                // If no valid devices found, try without productCode check
+                                if (validGuardianDevicesJm1s.length === 0 && jm1s.length > 0) {
+                                    logWarning('No devices matched GUARDIAN_PRODUCT_CODES. Creating devices anyway...');
+                                    if (!guardian) guardian = new Guardian({ debug: 3, serverType: 'l' });
+									allDiscoveredDevices = jm1s.map(jm1 => guardian._createDevice(jm1)).filter(d => d);
+									if (allDiscoveredDevices.length > 0) {
+										logSuccess(`Created ${allDiscoveredDevices.length} device(s) without productCode filter.`);
+                                    const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
+                                    if (purifier) {
+                                        logSuccess('Found Purifier device (Directly). Selecting it.');
+                                        targetDevice = purifier;
+                                    } else {
+                                        logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
+                                        allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                        targetDevice = allDiscoveredDevices[0];
+                                    }
+
+                                    populateDeviceSelector();
+                                    logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
+                                        connectToDevice();
+                                        return;
+                                    }
+                                }
                                 if (validGuardianDevicesJm1s.length > 0) {
                                     if (!guardian) guardian = new Guardian({ debug: 3, serverType: 'l' });
                                     allDiscoveredDevices = validGuardianDevicesJm1s.map(jm1 => new Purifier(guardian, jm1));
                                     logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
-                                    allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                    targetDevice = allDiscoveredDevices[0];
+                                    const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
+                                    if (purifier) {
+                                        logSuccess('Found Purifier device (Directly). Selecting it.');
+                                        targetDevice = purifier;
+                                    } else {
+                                        logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
+                                        allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                        targetDevice = allDiscoveredDevices[0];
+                                    }
+
                                     populateDeviceSelector();
-                                    logSuccess('Selecting device: ' + targetDevice.jm1.productCode + ' with ID ' + getDeviceIdentifier(targetDevice) + ', RSSI: ' + (targetDevice.jm1.rssi || 'N/A'));
+                                    logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
                                     connectToDevice();
                                 } else if (attemptCount < maxAttempts) {
                                     setTimeout(searchAttempt, 2000);
@@ -1080,15 +1243,20 @@
                     guardian.findDevices( function(devices) {
                         debugLog('Guardian found ' + devices.length + ' potential device(s)');
                         if (devices && devices.length > 0) {
-                            const validGuardianDevices = devices.filter(device => device.jm1 && device.jm1.productCode && GUARDIAN_PRODUCT_CODES.includes(device.jm1.productCode));
+                            const validGuardianDevices = devices.filter(device => device.jm1Type === 93240); // 93240 is the Purifier jm1Type
                             debugLog('Found ' + validGuardianDevices.length + ' valid Guardian device(s) via library.');
                             if (validGuardianDevices.length > 0) {
                                 allDiscoveredDevices = validGuardianDevices;
                                 logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
-                                allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                targetDevice = allDiscoveredDevices[0];
-                                populateDeviceSelector();
-                                logSuccess('Selecting device: ' + targetDevice.jm1.productCode + ' with ID ' + targetDevice.getUniqueId() + ', RSSI: ' + (targetDevice.jm1.rssi || 'N/A'));
+                                const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
+                                    if (purifier) {
+                                        logSuccess('Found Purifier device (Directly). Selecting it.');
+                                        targetDevice = purifier;
+                                    } else {
+                                        logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
+                                        allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                        targetDevice = allDiscoveredDevices[0];
+                                    }
                                 if (targetDevice.localKey) {
                                     logSuccess('Local key found. Connecting...');
                                     connectToDevice();
@@ -1240,6 +1408,16 @@
             targetDevice.getStatus( function(status) {
                 statusReceived = true;
                 clearTimeout(statusTimeout);
+				
+				if (status) {
+                    logSuccess('Initial status received!');
+                    debugLog('Current state: ' + JSON.stringify(status));
+                    updateUI(status);
+                    updateSettingsUI(status);
+                } else {
+                    logWarning('Initial status was null (device busy?). Skipping initial UI update.');
+                }
+				
                 logSuccess('Initial status received!');
                 debugLog('Current state: ' + JSON.stringify(status));
                 updateUI(status);
@@ -1280,14 +1458,16 @@
 
 			// Log toggle
 			const logToggle = document.getElementById('logToggle');
-			const debugInfoDiv1 = document.getElementById('debugInfo');
-			const debugInfoDiv2 = document.getElementById('debugInfo2');
-			logToggle.addEventListener('change', function(e) {
-				const showLog = e.target.checked;
-				debugInfoDiv1.classList.toggle('console-hidden', !showLog);
-				debugInfoDiv2.classList.toggle('console-hidden', !showLog);
-				localStorage.setItem('logVisible', showLog);
-			});
+            const debugInfoDiv1 = document.getElementById('debugInfo');
+            const debugInfoDiv2 = document.getElementById('debugInfo2');
+            const copyLogBtn = document.getElementById('copyLogBtn');
+            logToggle.addEventListener('change', function(e) {
+                const showLog = e.target.checked;
+                debugInfoDiv1.classList.toggle('console-hidden', !showLog);
+                debugInfoDiv2.classList.toggle('console-hidden', !showLog);
+                copyLogBtn.classList.toggle('console-hidden', !showLog);
+                localStorage.setItem('logVisible', showLog);
+            });
 
 			// Dark Mode toggle
 			const darkModeToggle = document.getElementById('darkModeToggle');
@@ -1323,8 +1503,120 @@
 				localStorage.setItem('darkMode', 'false');
 			});
 
+			// Polling Rate selector
+			const pollingRateSelect = document.getElementById('pollingRateSelect');
+			pollingRateSelect.addEventListener('change', function(e) {
+				const newRate = parseInt(e.target.value);
+				REFRESH_INTERVAL = newRate;
+				localStorage.setItem('pollingRate', newRate);
+				debugLog('⚡ Polling rate changed to ' + (newRate / 1000) + ' seconds');
+				
+				// Restart the refresh interval with new rate
+				if (statusRefreshInterval) {
+					clearInterval(statusRefreshInterval);
+					statusRefreshInterval = setInterval(() => {
+						if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
+							refreshStatusSilent();
+						}
+					}, REFRESH_INTERVAL);
+					logSuccess('Polling interval restarted with new rate');
+				}
+			});
+
 			// Device selector
 			document.getElementById('deviceSelect').addEventListener('change', handleDeviceChange);
+			document.getElementById('showKeyBtn').addEventListener('click', showAndCopyLocalKey);
+        }
+		
+		function copyLogToClipboard() {
+            const debugDiv1 = document.getElementById('debugInfo');
+            let logText = debugDiv1.innerText || debugDiv1.textContent;
+
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(logText).then(function() {
+                    logSuccess('Log copied to clipboard!');
+                }, function(err) {
+                    logError('Failed to copy log: ' + err);
+                });
+            } else {
+                logError('Clipboard API not available. Cannot copy.');
+            }
+        }
+		function pauseAppConnections() {
+            debugLog('App is moving to background (pagehide). Pausing connections.');
+            if (statusRefreshInterval) {
+                clearInterval(statusRefreshInterval);
+                statusRefreshInterval = null;
+                logSuccess('Polling stopped.');
+            }
+            if (targetDevice) {
+                if (typeof targetDevice.stopCommunication === 'function') {
+                    // This is a "fire and forget" disconnect.
+                    targetDevice.stopCommunication();
+                    logSuccess('Disconnect command sent.');
+                }
+                targetDevice.deviceId = null;
+                targetDevice.deviceHandle = null;
+                logWarning('Cleared stale deviceId and deviceHandle.');
+            }
+        }
+		function resumeAppConnections() {
+            debugLog('App resumed. Checking connection status...');
+            
+            // 1. If the interval is already running, don't stack them.
+            if (statusRefreshInterval) {
+                logWarning('Polling is already active on resume.');
+                return;
+            }
+
+            // 2. If we don't have a device, we can't poll.
+            if (!targetDevice) {
+                logError('Cannot resume polling, no target device selected.');
+                return;
+            }
+
+            // 3. Run the poller immediately ONCE.
+            //    refreshStatusSilent() will auto-reconnect if needed.
+            logSuccess('Running initial poll on resume...');
+            refreshStatusSilent(); 
+
+            // 4. Restart the regular polling interval.
+            statusRefreshInterval = setInterval(() => {
+                if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
+                    refreshStatusSilent();
+                }
+            }, REFRESH_INTERVAL);
+        }
+		window.addEventListener('pagehide', pauseAppConnections);
+		
+		function showAndCopyLocalKey() {
+            if (!targetDevice) {
+                logError('Cannot get key: No target device.');
+                alert('No device is connected.');
+                return;
+            }
+            if (!targetDevice.localKey) {
+                logError('Cannot get key: Device has no localKey.');
+                alert('No LocalKey found for this device.');
+                return;
+            }
+
+            const key = targetDevice.localKey;
+            logSuccess('Displaying LocalKey...');
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(key).then(function() {
+                    logSuccess('LocalKey copied to clipboard!');
+                    // Alert shows the key and confirms it was copied
+                    alert('Device LocalKey (copied to clipboard):\n\n' + key);
+                }, function(err) {
+                    logError('Failed to copy key: ' + err);
+                    alert('Failed to copy key. See console.');
+                });
+            } else {
+                logError('Clipboard API not available. Cannot copy.');
+                alert('LocalKey:\n\n' + key + '\n\n(Cannot copy automatically)');
+            }
         }
 
         function setupControlListeners() {
@@ -1379,6 +1671,7 @@
 
         function actualSendCommand(params) {
             debugLog('▶▶▶ SENDING: ' + JSON.stringify(params) + ' ▶▶▶');
+			updateUIOptimistic(params);
             const startTime = Date.now();
             const commandTimeout = setTimeout(() => {
                 logError('⏱️ Command timeout');
@@ -1388,12 +1681,10 @@
                 targetDevice.setStatus(params, function() {
                     clearTimeout(commandTimeout);
                     logSuccess('✅ Command CONFIRMED! (' + (Date.now() - startTime) + 'ms)');
-                    updateUIOptimistic(params);
                     setTimeout(refreshStatusSilent, 1500);
                 }, function(error) {
                     clearTimeout(commandTimeout);
-                    logError('❌ Command REJECTED (' + (Date.now() - startTime) + 'ms): ' + JSON.stringify(error));
-                    showError('Command failed: ' + error);
+                    logWarning('Command rejected (device busy): ' + JSON.stringify(error));
                 } );
             } catch (e) {
                 clearTimeout(commandTimeout);
@@ -1405,6 +1696,15 @@
         function refreshStatusSilent() {
             if (!targetDevice) return;
             targetDevice.getStatus( function(status) {
+			
+				if (status) {
+                    debugLog('BG Status: ' + JSON.stringify(status));
+                    updateUI(status);
+                    updateSettingsUI(status);
+                } else {
+                    debugLog('BG Status was null (device busy?). Skipping UI update.');
+                }
+			
                 debugLog('BG Status: ' + JSON.stringify(status));
                 updateUI(status);
                 updateSettingsUI(status);
@@ -1656,29 +1956,39 @@
 		});
 	}
 
-        function applySavedSettings() {
-		const logVisible = localStorage.getItem('logVisible') !== 'false';
-		const logToggle = document.getElementById('logToggle');
-		const debugInfoDiv1 = document.getElementById('debugInfo');
-		const debugInfoDiv2 = document.getElementById('debugInfo2');
-		logToggle.checked = logVisible;
-		debugInfoDiv1.classList.toggle('console-hidden', !logVisible);
-		debugInfoDiv2.classList.toggle('console-hidden', !logVisible);
-		
-		// Apply saved theme
-		const darkMode = localStorage.getItem('darkMode') === 'true';
-		const amoledMode = localStorage.getItem('amoledMode') === 'true';
-		
-		if (amoledMode) {
-			document.body.classList.add('amoled-mode');
-			document.getElementById('amoledModeToggle').checked = true;
-			updateIconsForTheme('amoled');
-		} else if (darkMode) {
-			document.body.classList.add('dark-mode');
-			document.getElementById('darkModeToggle').checked = true;
-			updateIconsForTheme('dark');
+			function applySavedSettings() {
+				const logVisible = localStorage.getItem('logVisible') !== 'false';
+				const logToggle = document.getElementById('logToggle');
+				const debugInfoDiv1 = document.getElementById('debugInfo');
+				const debugInfoDiv2 = document.getElementById('debugInfo2');
+				const copyLogBtn = document.getElementById('copyLogBtn');
+				logToggle.checked = logVisible;
+				debugInfoDiv1.classList.toggle('console-hidden', !logVisible);
+				debugInfoDiv2.classList.toggle('console-hidden', !logVisible);
+				copyLogBtn.classList.toggle('console-hidden', !logVisible);
+				
+				// Apply saved theme
+				const darkMode = localStorage.getItem('darkMode') === 'true';
+				const amoledMode = localStorage.getItem('amoledMode') === 'true';
+				
+				if (amoledMode) {
+					document.body.classList.add('amoled-mode');
+					document.getElementById('amoledModeToggle').checked = true;
+					updateIconsForTheme('amoled');
+				} else if (darkMode) {
+					document.body.classList.add('dark-mode');
+					document.getElementById('darkModeToggle').checked = true;
+					updateIconsForTheme('dark');
+				}
+				
+				// Apply saved polling rate
+				const savedPollingRate = localStorage.getItem('pollingRate');
+				if (savedPollingRate) {
+					REFRESH_INTERVAL = parseInt(savedPollingRate);
+					document.getElementById('pollingRateSelect').value = savedPollingRate;
+					debugLog('Restored polling rate: ' + (REFRESH_INTERVAL / 1000) + ' seconds');
+				}
 			}
-		}
 
         window.addEventListener('beforeunload', function() {
             if (statusRefreshInterval) clearInterval(statusRefreshInterval);
