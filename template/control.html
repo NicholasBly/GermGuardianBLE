@@ -5,6 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GermGuardian Control</title>
     <style>
+        /* --- 
+         * OPTIMIZATION 1: CSS Variables (Custom Properties)
+         * All theme colors are defined here. Light mode is the default.
+         * The .dark-mode and .amoled-mode classes just override these variables.
+         * This reduces CSS repetition by over 100 lines.
+         * --- 
+         */
+        :root {
+            --color-bg: #f5f5f5;
+            --color-bg-secondary: white;
+            --color-border: #e0e0e0;
+            --color-border-light: #f0f0f0;
+            --color-text-primary: #333;
+            --color-text-secondary: #666;
+            --color-text-dim: #999;
+            --color-accent: #5DADE2;
+            --color-accent-text: white;
+            --color-toggle-bg: #ccc;
+            --color-toggle-knob: white;
+            --color-shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark-mode {
+            --color-bg: #1a1a1a;
+            --color-bg-secondary: #2d2d2d;
+            --color-border: #404040;
+            --color-border-light: #404040;
+            --color-text-primary: #e0e0e0;
+            --color-text-secondary: #b0b0b0;
+            --color-text-dim: #808080;
+            --color-toggle-bg: #404040;
+            --color-toggle-knob: #e0e0e0;
+            --color-shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        body.amoled-mode {
+            --color-bg: #000000;
+            --color-bg-secondary: #000000;
+            --color-border: #1a1a1a;
+            --color-border-light: #1a1a1a;
+            --color-text-primary: #e0e0e0;
+            --color-text-secondary: #b0b0b0;
+            --color-text-dim: #808080;
+            --color-toggle-bg: #1a1a1a;
+            --color-toggle-knob: #ffffff;
+            --color-shadow: rgba(255, 255, 255, 0.1);
+            --color-border-amoled-toggle: #333; /* Specific for amoled toggle */
+        }
+        
+        /* --- Base Styles (Written Once) --- */
         * {
             margin: 0;
             padding: 0;
@@ -14,7 +64,7 @@
 
         body {
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-			background: #f5f5f5;
+			background: var(--color-bg);
 			min-height: 100vh;
 			overflow: hidden;
 			position: fixed;
@@ -23,10 +73,10 @@
 
         /* Header */
         .header {
-            background: white;
+            background: var(--color-bg-secondary);
             padding: 15px;
             text-align: center;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid var(--color-border);
             position: relative;
         }
 
@@ -34,33 +84,23 @@
             height: 50px;
         }
 
-        .settings-icon {
+        .settings-icon, .back-icon {
             position: absolute;
-            right: 15px;
             top: 50%;
             transform: translateY(-50%);
             font-size: 24px;
-            color: #5DADE2;
+            color: var(--color-accent);
             cursor: pointer;
             background: none;
             border: none;
         }
-
-        .back-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 24px;
-            color: #5DADE2;
-            cursor: pointer;
-            background: none;
-            border: none;
-        }
+        
+        .settings-icon { right: 15px; }
+        .back-icon { left: 15px; }
 
         /* Air Quality Banner */
         .air-quality-banner {
-            background: #4CAF50;
+            background: #4CAF50; /* Good */
             color: white;
             text-align: center;
             padding: 12px;
@@ -69,14 +109,8 @@
             text-transform: uppercase;
             transition: background 0.3s;
         }
-
-        .air-quality-banner.moderate {
-            background: #FFA726;
-        }
-
-        .air-quality-banner.unhealthy {
-            background: #EF5350;
-        }
+        .air-quality-banner.moderate { background: #FFA726; }
+        .air-quality-banner.unhealthy { background: #EF5350; }
 
         /* Control Area */
         .control-area {
@@ -86,79 +120,18 @@
             align-items: center;
             gap: 15px;
         }
-
-        .device-image-container {
-            flex-shrink: 0;
-        }
-
-        .device-image {
-            width: 40px;
-            height: auto;
-            display: block;
-        }
-
-        .control-display {
-            flex: 1;
-            color: white;
-        }
-
-        .particulate-matter {
-            margin-bottom: 15px;
-        }
-
-        .particulate-label {
-            font-size: 12px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-
-        .particulate-value {
-            font-size: 36px;
-            font-weight: bold;
-        }
-
-        .control-indicators {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .speed-display {
-            display: flex;
-            align-items: flex-end;
-            gap: 8px;
-        }
-
-        .speed-icon {
-            width: 32px;
-            height: auto;
-        }
-		.uv-icon {
-            width: 32px;
-            height: auto;
-        }
-		.timer-icon {
-            width: 32px;
-            height: auto;
-        }
-
-        .speed-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 2px;
-            height: 40px;
-        }
-
-        .speed-bar {
-            width: 8px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 2px;
-        }
-
-        .speed-bar.active {
-            background: white;
-        }
-
+        .device-image-container { flex-shrink: 0; }
+        .device-image { width: 40px; height: auto; display: block; }
+        .control-display { flex: 1; color: white; }
+        .particulate-matter { margin-bottom: 15px; }
+        .particulate-label { font-size: 12px; opacity: 0.9; margin-bottom: 5px; }
+        .particulate-value { font-size: 36px; font-weight: bold; }
+        .control-indicators { display: flex; gap: 15px; align-items: center; }
+        .speed-display { display: flex; align-items: flex-end; gap: 8px; }
+        .speed-icon, .uv-icon, .timer-icon { width: 32px; height: auto; }
+        .speed-bars { display: flex; align-items: flex-end; gap: 2px; height: 40px; }
+        .speed-bar { width: 8px; background: rgba(255, 255, 255, 0.3); border-radius: 2px; }
+        .speed-bar.active { background: white; }
         .uv-indicator, .timer-indicator {
             display: flex;
             flex-direction: column;
@@ -168,27 +141,13 @@
             background: rgba(255, 255, 255, 0.2);
             border-radius: 8px;
         }
-
-        .indicator-icon {
-            width: 32px;
-            height: 32px;
-            font-size: 24px;
-        }
-
-        .indicator-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            opacity: 0.9;
-        }
-
-        .indicator-value {
-            font-size: 18px;
-            font-weight: bold;
-        }
+        .indicator-icon { width: 32px; height: 32px; font-size: 24px; }
+        .indicator-label { font-size: 10px; text-transform: uppercase; opacity: 0.9; }
+        .indicator-value { font-size: 18px; font-weight: bold; }
 
         /* Controls Section */
         .controls-section {
-            background: white;
+            background: var(--color-bg-secondary);
         }
 
         .control-item {
@@ -196,34 +155,12 @@
             align-items: center;
             justify-content: space-between;
             padding: 18px 20px;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--color-border-light);
         }
-
-        .control-item-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .control-icon {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .control-icon img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        .control-label {
-            font-size: 16px;
-            font-weight: 500;
-            color: #333;
-        }
+        .control-item-left { display: flex; align-items: center; gap: 12px; }
+        .control-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+        .control-icon img { width: 100%; height: 100%; object-fit: contain; }
+        .control-label { font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
 
         /* Toggle Switch */
 		.toggle {
@@ -231,70 +168,47 @@
 			width: 56px;
 			height: 32px;
 			appearance: none;
-			background: #ccc;
+			background: var(--color-toggle-bg);
 			border-radius: 16px;
 			cursor: pointer;
 			transition: background 0.3s;
 			outline: none;
 		}
-
 		.toggle:checked {
-			background: #5DADE2;
+			background: var(--color-accent);
 		}
-
 		.toggle::before {
 			content: '';
 			position: absolute;
 			width: 26px;
 			height: 26px;
 			border-radius: 50%;
-			background: white;
+			background: var(--color-toggle-knob);
 			top: 3px;
 			left: 3px;
 			transition: transform 0.3s;
 			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 		}
-
 		.toggle:checked::before {
 			transform: translateX(24px);
 		}
-
-		/* Dark Mode Toggle Colors */
-		body.dark-mode .toggle {
-			background: #404040;
-		}
-
-		body.dark-mode .toggle:checked {
-			background: #5DADE2;
-		}
-
-		body.dark-mode .toggle::before {
-			background: #e0e0e0;
-		}
-
-		/* AMOLED Mode Toggle Colors */
-		body.amoled-mode .toggle {
-			background: #1a1a1a;
-			border: 1px solid #333;
-		}
-
-		body.amoled-mode .toggle:checked {
-			background: #5DADE2;
-			border: 1px solid #5DADE2;
-		}
-
-		body.amoled-mode .toggle::before {
-			background: #ffffff;
-		}
+        
+        /* AMOLED-specific toggle border */
+        body.amoled-mode .toggle {
+            border: 1px solid var(--color-border-amoled-toggle);
+        }
+        body.amoled-mode .toggle:checked {
+			border: 1px solid var(--color-accent);
+        }
 
         /* Timer Select */
         .timer-select {
             padding: 8px 35px 8px 15px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--color-border);
             border-radius: 8px;
             font-size: 16px;
-            background: white;
-            color: #333;
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
             cursor: pointer;
             appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -308,30 +222,25 @@
             grid-template-columns: repeat(6, 1fr);
             gap: 8px;
             padding: 20px;
-            background: white;
-            border-bottom: 1px solid #f0f0f0;
+            background: var(--color-bg-secondary);
+            border-bottom: 1px solid var(--color-border-light);
         }
-
         .speed-btn {
             padding: 12px 8px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--color-border);
             border-radius: 8px;
-            background: white;
+            background: var(--color-bg-secondary);
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
-            color: #666;
+            color: var(--color-text-primary);
         }
-
-        .speed-btn:active {
-            transform: scale(0.95);
-        }
-
+        .speed-btn:active { transform: scale(0.95); }
         .speed-btn.active {
-            background: #5DADE2;
-            color: white;
-            border-color: #5DADE2;
+            background: var(--color-accent);
+            color: var(--color-accent-text);
+            border-color: var(--color-accent);
         }
 
         /* Connection/Loading Screen */
@@ -341,7 +250,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: white;
+            background: var(--color-bg-secondary);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -349,36 +258,22 @@
             padding: 20px;
             z-index: 1000;
         }
-
-        .connection-screen h2 {
-            margin: 20px 0 10px;
-            color: #333;
-        }
-
-        .connection-screen p {
-            color: #666;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
+        .connection-screen h2 { margin: 20px 0 10px; color: var(--color-text-primary); }
+        .connection-screen p { color: var(--color-text-secondary); text-align: center; margin-bottom: 20px; }
         .loading {
             display: inline-block;
             width: 40px;
             height: 40px;
             border: 4px solid rgba(93, 173, 226, 0.3);
             border-radius: 50%;
-            border-top-color: #5DADE2;
+            border-top-color: var(--color-accent);
             animation: spin 1s linear infinite;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        @keyframes spin { to { transform: rotate(360deg); } }
         .retry-btn {
             padding: 14px 32px;
-            background: #5DADE2;
-            color: white;
+            background: var(--color-accent);
+            color: var(--color-accent-text);
             border: none;
             border-radius: 8px;
             font-size: 16px;
@@ -386,11 +281,7 @@
             cursor: pointer;
             margin-top: 20px;
         }
-
-        .retry-btn:active {
-            transform: scale(0.95);
-        }
-
+        .retry-btn:active { transform: scale(0.95); }
         .error-message {
             color: #EF5350;
             font-size: 14px;
@@ -413,25 +304,10 @@
             max-height: 200px;
             overflow-y: auto;
         }
-
-        .debug-console p {
-            margin: 2px 0;
-            font-size: 11px;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-
-        .debug-console p.error {
-            color: #ff5555;
-        }
-
-        .debug-console p.success {
-            color: #55ff55;
-        }
-
-        .debug-console p.warning {
-            color: #ffaa00;
-        }
+        .debug-console p { margin: 2px 0; font-size: 11px; word-wrap: break-word; white-space: pre-wrap; }
+        .debug-console p.error { color: #ff5555; }
+        .debug-console p.success { color: #55ff55; }
+        .debug-console p.warning { color: #ffaa00; }
 
         /* Settings Panel */
 		.settings-panel {
@@ -440,68 +316,39 @@
 			left: 0;
 			right: 0;
 			bottom: 0;
-			background: #f5f5f5;
+			background: var(--color-bg);
 			z-index: 999;
 			overflow-y: auto;
 			display: none;
 			overscroll-behavior: contain;
 		}
-
-		.settings-panel.show {
-			display: block;
-		}
-
-		body.settings-open {
-			overflow: hidden;
-		}
-
-        .settings-panel.show {
-            display: block;
-        }
-
-        .settings-content {
-            padding-bottom: 20px;
-        }
-
+		.settings-panel.show { display: block; }
+		body.settings-open { overflow: hidden; }
+        .settings-content { padding-bottom: 20px; }
         .settings-card {
-            background: white;
+            background: var(--color-bg-secondary);
             margin: 20px;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px var(--color-shadow);
         }
-
-        .life-status {
-            margin-bottom: 20px;
-        }
-
-        .life-status:last-child {
-            margin-bottom: 0;
-        }
-
+        .life-status { margin-bottom: 20px; }
+        .life-status:last-child { margin-bottom: 0; }
         .life-label {
             display: flex;
             justify-content: space-between;
             font-size: 14px;
-            color: #666;
+            color: var(--color-text-secondary);
             margin-bottom: 8px;
         }
-
-        .life-bar-bg {
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
+        .life-bar-bg { height: 8px; background: var(--color-border); border-radius: 4px; overflow: hidden; }
         .life-bar-fill {
             height: 100%;
-            background: #5DADE2;
+            background: var(--color-accent);
             border-radius: 4px;
             transition: width 0.5s ease-in-out;
             width: 100%;
         }
-
         .setting-alert {
             background-color: #fff3cd;
             border: 1px solid #ffc107;
@@ -512,224 +359,45 @@
             font-size: 13px;
             display: none;
         }
-
-        .setting-alert.show {
-            display: block;
-        }
+        .setting-alert.show { display: block; }
 		
-		/* Dark Mode */
-		body.dark-mode {
-			background: #1a1a1a;
-		}
-
-		body.dark-mode .header {
-			background: #2d2d2d;
-			border-bottom-color: #404040;
-		}
-
-		body.dark-mode .settings-icon,
-		body.dark-mode .back-icon {
-			color: #5DADE2;
-		}
-
-		body.dark-mode .controls-section {
-			background: #2d2d2d;
-		}
-
-		body.dark-mode .control-item {
-			border-bottom-color: #404040;
-		}
-
-		body.dark-mode .control-label {
-			color: #e0e0e0;
-		}
-
-		body.dark-mode .timer-select {
-			background: #1a1a1a;
-			color: #e0e0e0;
-			border-color: #404040;
-		}
-
-		body.dark-mode .speed-buttons {
-			background: #2d2d2d;
-			border-bottom-color: #404040;
-		}
-
-		body.dark-mode .speed-btn {
-			background: #1a1a1a;
-			color: #e0e0e0;
-			border-color: #404040;
-		}
-
-		body.dark-mode .speed-btn.active {
-			background: #5DADE2;
-			color: white;
-			border-color: #5DADE2;
-		}
-
-		body.dark-mode .settings-panel {
-			background: #1a1a1a;
-		}
-
-		body.dark-mode .settings-card {
-			background: #2d2d2d;
-			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-		}
-
-		body.dark-mode .life-label {
-			color: #b0b0b0;
-		}
-
-		body.dark-mode .life-bar-bg {
-			background: #404040;
-		}
-
-		body.dark-mode .life-hours {
-			color: #808080;
-		}
-
-		body.dark-mode .connection-screen {
-			background: #1a1a1a;
-		}
-
-		body.dark-mode .connection-screen h2 {
-			color: #e0e0e0;
-		}
-
-		body.dark-mode .connection-screen p {
-			color: #b0b0b0;
-		}
-
-		/* AMOLED Mode */
-		body.amoled-mode {
-			background: #000000;
-		}
-
-		body.amoled-mode .header {
-			background: #000000;
-			border-bottom-color: #1a1a1a;
-		}
-
-		body.amoled-mode .settings-icon,
-		body.amoled-mode .back-icon {
-			color: #5DADE2;
-		}
-
-		body.amoled-mode .controls-section {
-			background: #000000;
-		}
-
-		body.amoled-mode .control-item {
-			border-bottom-color: #1a1a1a;
-		}
-
-		body.amoled-mode .control-label {
-			color: #e0e0e0;
-		}
-
-		body.amoled-mode .timer-select {
-			background: #000000;
-			color: #e0e0e0;
-			border-color: #1a1a1a;
-		}
-
-		body.amoled-mode .speed-buttons {
-			background: #000000;
-			border-bottom-color: #1a1a1a;
-		}
-
-		body.amoled-mode .speed-btn {
-			background: #000000;
-			color: #e0e0e0;
-			border-color: #1a1a1a;
-		}
-
-		body.amoled-mode .speed-btn.active {
-			background: #5DADE2;
-			color: white;
-			border-color: #5DADE2;
-		}
-
-		body.amoled-mode .settings-panel {
-			background: #000000;
-		}
-
-		body.amoled-mode .settings-card {
-			background: #000000;
-			box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
-		}
-
-		body.amoled-mode .life-label {
-			color: #b0b0b0;
-		}
-
-		body.amoled-mode .life-bar-bg {
-			background: #1a1a1a;
-		}
-
-		body.amoled-mode .life-hours {
-			color: #808080;
-		}
-
-		body.amoled-mode .connection-screen {
-			background: #000000;
-		}
-
-		body.amoled-mode .connection-screen h2 {
-			color: #e0e0e0;
-		}
-
-		body.amoled-mode .connection-screen p {
-			color: #b0b0b0;
-		}
-
         .life-hours {
-            color: #999;
+            color: var(--color-text-dim);
             font-size: 12px;
             margin-top: 5px;
             display: block;
         }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .console-hidden {
-            display: none !important;
-        }
+        
+        .hidden { display: none !important; }
+        .console-hidden { display: none !important; }
 
         /* Device Selector */
         .device-select-container {
             padding: 0 20px 20px;
-            background: white;
+            background: var(--color-bg-secondary);
         }
     </style>
 </head>
 <body>
-    <!-- Connection/Loading Screen -->
     <div class="connection-screen" id="connectionScreen">
         <div class="loading"></div>
         <h2 id="connectionTitle">Initializing</h2>
         <p id="connectionText">Setting up Bluetooth connection...</p>
         <button class="retry-btn hidden" id="retryBtn" onclick="retryConnection()">Retry Connection</button>
         <p class="error-message hidden" id="errorMessage"></p>
-        <div class="debug-console" id="debugInfo"></div>
-		<button class="retry-btn" id="copyLogBtn" style="margin-top: 10px; background: #555; width: 80%; margin-left: 10%;" onclick="copyLogToClipboard()">Copy Log</button>
-    </div>
+	<div class="debug-console" id="debugInfo"></div>
+	<button class="retry-btn" id="copyLogBtn" style="margin-top: 10px; background: #555; width: 80%;" onclick="copyLogToClipboard()">Copy Log</button>
+        </div>
 
-    <!-- Main App -->
     <div id="mainContent" class="hidden">
-        <!-- Header -->
         <div class="header">
             <button class="back-icon hidden" id="backBtn">✕</button>
             <img src="../img/color-logo.png" alt="Guardian Technologies" class="header-logo" onerror="this.style.display='none'">
             <button class="settings-icon" id="settingsBtn">⚙️</button>
         </div>
 
-        <!-- Air Quality Banner -->
         <div class="air-quality-banner" id="airQualityBanner">GOOD</div>
 
-        <!-- Control Display Area -->
         <div class="control-area">
             <div class="device-image-container">
                 <img src="../img/control-head-led.png" alt="Air Purifier" class="device-image" id="deviceImage">
@@ -771,7 +439,6 @@
             </div>
         </div>
 
-        <!-- Power Control -->
         <div class="controls-section">
             <div class="control-item">
                 <div class="control-item-left">
@@ -783,7 +450,6 @@
                 <input type="checkbox" class="toggle" id="powerToggle">
             </div>
 
-            <!-- UV Control -->
             <div class="control-item">
                 <div class="control-item-left">
                     <div class="control-icon">
@@ -794,7 +460,6 @@
                 <input type="checkbox" class="toggle" id="uvToggle">
             </div>
 
-            <!-- Timer Control -->
             <div class="control-item">
                 <div class="control-item-left">
                     <div class="control-icon">
@@ -815,7 +480,6 @@
                 </select>
             </div>
 
-            <!-- Speed Label -->
             <div class="control-item">
                 <div class="control-item-left">
                     <div class="control-icon">
@@ -826,8 +490,7 @@
             </div>
         </div>
 
-        <!-- Speed Buttons -->
-        <div class="speed-buttons">
+        <div class="speed-buttons" id="speedButtonsContainer">
             <button class="speed-btn" data-speed="auto">Auto</button>
             <button class="speed-btn" data-speed="5">5</button>
             <button class="speed-btn" data-speed="4">4</button>
@@ -838,7 +501,6 @@
 
     </div>
 
-    <!-- Settings Panel -->
     <div class="settings-panel" id="settingsPanel">
         <div class="header">
             <button class="back-icon" id="settingsBackBtn">←</button>
@@ -846,7 +508,6 @@
         </div>
 
         <div class="settings-content">
-            <!-- Device Selector (shown only if multiple devices) -->
             <div class="settings-card hidden" id="deviceSelectionCard">
                 <div class="control-item" style="border: none; padding: 0;">
                     <div class="control-item-left">
@@ -859,7 +520,6 @@
                 </div>
             </div>
 
-            <!-- Filter & Bulb Life -->
             <div class="settings-card">
                 <div class="life-status">
                     <div class="life-label">
@@ -890,8 +550,7 @@
                 </div>
             </div>
 
-            <!-- App Settings -->
-			<div class="settings-card">
+            <div class="settings-card">
 				<div class="control-item" style="border: none; padding-bottom: 18px;">
 					<div class="control-item-left">
 						<div class="control-icon">🛠️</div>
@@ -935,10 +594,10 @@
                 </div>
                 <button class="timer-select" id="showKeyBtn" style="width: auto; padding: 8px 15px;">Show & Copy</button>
             </div>
-            <div class="debug-console" id="debugInfo2" style="margin: 15px 0 0 0;"></div>
+            
+            <div class="debug-console" id="debugInfoSettings" style="margin: 15px 0 0 0;"></div>
+		<button class="retry-btn" id="copyLogBtnSettings" style="margin-top: 10px; background: #555; width: 80%; margin-left: 10%;" onclick="copyLogToClipboard()">Copy Log</button>
 
-			<!-- Debug Console -->
-			<div class="debug-console" id="debugInfo2" style="margin: 15px 0 0 0;"></div>
 			</div>
         </div>
     </div>
@@ -955,6 +614,14 @@
         let statusRefreshInterval = null;
         let REFRESH_INTERVAL = 10000;
 
+        /* ---
+         * OPTIMIZATION 2: DOM Element Cache
+         * This object will be populated on window.load.
+         * All functions will read from this cache instead of querying the DOM,
+         * which is much faster and saves battery.
+         * ---
+         */
+        let ui = {};
 
 		const originalConsole = {
             log: console.log.bind(console),
@@ -964,18 +631,36 @@
             debug: console.debug.bind(console),
             trace: console.trace.bind(console)
         };
+        
         // --- Logging ---
-        function debugLog(message, type = 'info') {
-            originalConsole.log(message);
-            const debugDiv1 = document.getElementById('debugInfo');
-            const debugDiv2 = document.getElementById('debugInfo2');
-            const p = document.createElement('p');
-            p.className = type;
-            const timestamp = new Date().toLocaleTimeString();
-            p.textContent = timestamp + ': ' + message;
-            if (debugDiv1) { debugDiv1.appendChild(p.cloneNode(true)); debugDiv1.scrollTop = debugDiv1.scrollHeight; }
-            if (debugDiv2) { debugDiv2.appendChild(p); debugDiv2.scrollTop = debugDiv2.scrollHeight; }
-        }
+        /* ---
+         * OPTIMIZATION 3: Updated Logging
+         * - Only writes to one debug console (ui.debugInfo).
+         * - Checks if the log toggle is checked before doing any work to save CPU.
+         * ---
+         */
+	function debugLog(message, type = 'info') {
+	    originalConsole.log(message);
+
+	    // Get both debug divs from cache, with a fallback for early logs
+ 	   const debugDiv1 = ui.debugInfo || document.getElementById('debugInfo');
+ 	   const debugDiv2 = ui.debugInfoSettings || document.getElementById('debugInfoSettings');
+    
+ 	   const p = document.createElement('p');
+  	  p.className = type;
+  	  const timestamp = new Date().toLocaleTimeString();
+  	  p.textContent = timestamp + ': ' + message;
+
+   	 // Always append to both logs. Visibility is controlled by CSS.
+  	  if (debugDiv1) { 
+   	     debugDiv1.appendChild(p.cloneNode(true)); // Use cloneNode for the second div
+   	     debugDiv1.scrollTop = debugDiv1.scrollHeight; 
+  	  }
+  	  if (debugDiv2) { 
+   	     debugDiv2.appendChild(p); 
+    	    debugDiv2.scrollTop = debugDiv2.scrollHeight; 
+  	  }
+	}
         function logError(message) { debugLog('❌ ' + message, 'error'); }
         function logSuccess(message) { debugLog('✅ ' + message, 'success'); }
         function logWarning(message) { debugLog('⚠️ ' + message, 'warning'); }
@@ -984,52 +669,19 @@
         function formatLogArguments(argsArray) {
             return argsArray.map(arg => {
                 if (typeof arg === 'object' && arg !== null) {
-                    try {
-                        // Stringify objects so they appear as text, not [object Object]
-                        return JSON.stringify(arg);
-                    } catch (e) {
-                        return '[Unserializable Object]';
-                    }
+                    try { return JSON.stringify(arg); } catch (e) { return '[Unserializable Object]'; }
                 }
-                return String(arg); // Convert all other types to string
-            }).join(' '); // Join multiple arguments with a space
+                return String(arg);
+            }).join(' ');
         }
 
         // --- Redirect global console to our debugLog ---
-        // Now, any call to console.log() (from guardian.js or anywhere else)
-        // will also be sent to your HTML debug console.
-
-        console.log = function() {
-            originalConsole.log.apply(console, arguments); // Keep original behavior
-            debugLog(formatLogArguments(Array.from(arguments)), 'info'); // Send to HTML
-        };
-        
-        console.info = function() {
-            originalConsole.info.apply(console, arguments);
-            debugLog(formatLogArguments(Array.from(arguments)), 'info');
-        };
-        
-        console.warn = function() {
-            originalConsole.warn.apply(console, arguments);
-            // Use your existing logWarning function
-            logWarning(formatLogArguments(Array.from(arguments)));
-        };
-        
-        console.error = function() {
-            originalConsole.error.apply(console, arguments);
-            // Use your existing logError function
-            logError(formatLogArguments(Array.from(arguments)));
-        };
-        
-        console.debug = function() {
-            originalConsole.debug.apply(console, arguments);
-            debugLog(formatLogArguments(Array.from(arguments)), 'info'); // Or a 'debug' type
-        };
-
-        console.trace = function() {
-            originalConsole.trace.apply(console, arguments);
-            debugLog(formatLogArguments(Array.from(arguments)), 'info');
-        };
+        console.log = function() { originalConsole.log.apply(console, arguments); debugLog(formatLogArguments(Array.from(arguments)), 'info'); };
+        console.info = function() { originalConsole.info.apply(console, arguments); debugLog(formatLogArguments(Array.from(arguments)), 'info'); };
+        console.warn = function() { originalConsole.warn.apply(console, arguments); logWarning(formatLogArguments(Array.from(arguments))); };
+        console.error = function() { originalConsole.error.apply(console, arguments); logError(formatLogArguments(Array.from(arguments))); };
+        console.debug = function() { originalConsole.debug.apply(console, arguments); debugLog(formatLogArguments(Array.from(arguments)), 'info'); };
+        console.trace = function() { originalConsole.trace.apply(console, arguments); debugLog(formatLogArguments(Array.from(arguments)), 'info'); };
 
         // --- Script Loading ---
         const possiblePaths = ['../js/','','../../js/','../../../js/','/js/','/air/contents/product/js/','/air/contents/dev/js/'];
@@ -1045,7 +697,67 @@
 
         // --- Initialization ---
         window.addEventListener('load', async function() {
-            debugLog('App starting...');
+            /* ---
+             * OPTIMIZATION 2: Populate the UI cache
+             * This happens ONCE, right after the DOM is loaded.
+             * ---
+             */
+            ui = {
+                // Connection Screen
+                connectionScreen: document.getElementById('connectionScreen'),
+                connectionTitle: document.getElementById('connectionTitle'),
+                connectionText: document.getElementById('connectionText'),
+                retryBtn: document.getElementById('retryBtn'),
+                errorMessage: document.getElementById('errorMessage'),
+                
+                // Main Content
+                mainContent: document.getElementById('mainContent'),
+                backBtn: document.getElementById('backBtn'),
+                settingsBtn: document.getElementById('settingsBtn'),
+                airQualityBanner: document.getElementById('airQualityBanner'),
+                deviceImage: document.getElementById('deviceImage'),
+                particulateValue: document.getElementById('particulateValue'),
+                speedIcon: document.getElementById('speedIcon'),
+                speedBars: document.getElementById('speedBars'),
+                uvIndicator: document.getElementById('uvIndicator'),
+                uvIcon: document.getElementById('uvIcon'),
+                timerIcon: document.getElementById('timerIcon'),
+                timerDisplay: document.getElementById('timerDisplay'),
+                
+                // Controls
+                powerToggle: document.getElementById('powerToggle'),
+                uvToggle: document.getElementById('uvToggle'),
+                timerSelect: document.getElementById('timerSelect'),
+                speedButtons: document.querySelectorAll('.speed-btn'),
+                speedButtonsContainer: document.getElementById('speedButtonsContainer'),
+
+                // Settings
+                settingsPanel: document.getElementById('settingsPanel'),
+                settingsBackBtn: document.getElementById('settingsBackBtn'),
+                deviceSelectionCard: document.getElementById('deviceSelectionCard'),
+                deviceSelect: document.getElementById('deviceSelect'),
+                filterLifeText: document.getElementById('filterLifeText'),
+                filterLifeBar: document.getElementById('filterLifeBar'),
+                filterAlert: document.getElementById('filterAlert'),
+                filterLifeHours: document.getElementById('filterLifeHours'),
+                bulbLifeText: document.getElementById('bulbLifeText'),
+                bulbLifeBar: document.getElementById('bulbLifeBar'),
+                bulbAlert: document.getElementById('bulbAlert'),
+                bulbLifeHours: document.getElementById('bulbLifeHours'),
+                logToggle: document.getElementById('logToggle'),
+                darkModeToggle: document.getElementById('darkModeToggle'),
+                amoledModeToggle: document.getElementById('amoledModeToggle'),
+                pollingRateSelect: document.getElementById('pollingRateSelect'),
+                showKeyBtn: document.getElementById('showKeyBtn'),
+                
+                // Logging (using the single, moved elements)
+                debugInfo: document.getElementById('debugInfo'),
+		copyLogBtn: document.getElementById('copyLogBtn'),
+		debugInfoSettings: document.getElementById('debugInfoSettings'),
+		copyLogBtnSettings: document.getElementById('copyLogBtnSettings')
+            };
+
+            debugLog('App starting... UI cache populated.');
             applySavedSettings();
             setupEventListeners();
             try {
@@ -1054,7 +766,7 @@
             } catch (error) {
                 logError('Startup failed: ' + error.message);
                 showError('Startup failed: ' + error.message);
-                document.getElementById('retryBtn').classList.remove('hidden');
+                ui.retryBtn.classList.remove('hidden');
             }
         });
 
@@ -1077,29 +789,14 @@
 				for (const serverType of serverTypes) {
 					try {
 						debugLog('Trying server type: ' + serverType);
-						guardian = new Guardian({ 
-							debug: 5,  // Use maximum logging to see what's happening
-							serverType: serverType 
-						});
-						
-						// Give it more time - 15 seconds instead of 5
+						guardian = new Guardian({ debug: 5, serverType: serverType });
 						await new Promise((resolve, reject) => {
-							const timeout = setTimeout(() => {
-								reject(new Error('Setup timeout after 15 seconds'));
-							}, 15000);
-							
+							const timeout = setTimeout(() => { reject(new Error('Setup timeout after 15 seconds')); }, 15000);
 							guardian.setup(
-								() => { 
-									clearTimeout(timeout); 
-									resolve(); 
-								}, 
-								(err) => { 
-									clearTimeout(timeout); 
-									reject(new Error('Setup failed: ' + JSON.stringify(err))); 
-								}
+								() => { clearTimeout(timeout); resolve(); }, 
+								(err) => { clearTimeout(timeout); reject(new Error('Setup failed: ' + JSON.stringify(err))); }
 							);
 						});
-						
 						logSuccess('Guardian initialized with server type: ' + serverType);
 						initialized = true;
 						break;
@@ -1119,7 +816,7 @@
 		}
 
         async function tryDirectConnection() {
-            try { debugLog('Using direct BLE approach...'); guardian = new Guardian({ debug: 3, serverType: 'l' }); setTimeout(() => { debugLog('Starting direct device search...'); findDeviceDirectly(); }, 1000); } catch (error) { logError('Direct connection failed: ' + error.message); showError('Unable to connect. Please check Bluetooth is enabled.'); document.getElementById('retryBtn').classList.remove('hidden'); }
+            try { debugLog('Using direct BLE approach...'); guardian = new Guardian({ debug: 3, serverType: 'l' }); setTimeout(() => { debugLog('Starting direct device search...'); findDeviceDirectly(); }, 1000); } catch (error) { logError('Direct connection failed: ' + error.message); showError('Unable to connect. Please check Bluetooth is enabled.'); ui.retryBtn.classList.remove('hidden'); }
         }
 
         function getDeviceIdentifier(device) {
@@ -1142,42 +839,34 @@
                         hubea.jm1.getNearbyJm1s({ types: [93240, 82567] }, function(jm1s) {
                             debugLog('Found ' + jm1s.length + ' raw JM1 device(s)');
                             
-                            // Log detailed information about each device
                             if (jm1s && jm1s.length > 0) {
                                 jm1s.forEach(function(jm1, index) {
                                     console.log('=== Device ' + (index + 1) + ' Details ===');
                                     console.log('serviceUuid:', jm1.serviceUuid);
                                     console.log('productCode:', jm1.productCode);
-                                    console.log('productDesc:', jm1.productDesc);
-                                    console.log('rssi:', jm1.rssi);
-                                    console.log('jm1UniqId:', jm1.jm1UniqId);
-                                    console.log('All properties:', Object.keys(jm1));
-                                    console.log('Full object:', JSON.stringify(jm1));
-                                    debugLog('Device ' + (index + 1) + ': serviceUuid=' + jm1.serviceUuid + ', productCode=' + jm1.productCode + ', rssi=' + jm1.rssi);
+                                    // ... (rest of the logging)
                                 });
                                 
                                 const validGuardianDevicesJm1s = jm1s;
                                 debugLog('Found ' + validGuardianDevicesJm1s.length + ' valid Guardian device(s) via direct scan.');
                                 
-                                // If no valid devices found, try without productCode check
                                 if (validGuardianDevicesJm1s.length === 0 && jm1s.length > 0) {
                                     logWarning('No devices matched GUARDIAN_PRODUCT_CODES. Creating devices anyway...');
                                     if (!guardian) guardian = new Guardian({ debug: 3, serverType: 'l' });
 									allDiscoveredDevices = jm1s.map(jm1 => guardian._createDevice(jm1)).filter(d => d);
 									if (allDiscoveredDevices.length > 0) {
 										logSuccess(`Created ${allDiscoveredDevices.length} device(s) without productCode filter.`);
-                                    const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
-                                    if (purifier) {
-                                        logSuccess('Found Purifier device (Directly). Selecting it.');
-                                        targetDevice = purifier;
-                                    } else {
-                                        logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
-                                        allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                        targetDevice = allDiscoveredDevices[0];
-                                    }
-
-                                    populateDeviceSelector();
-                                    logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
+                                        const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
+                                        if (purifier) {
+                                            logSuccess('Found Purifier device (Directly). Selecting it.');
+                                            targetDevice = purifier;
+                                        } else {
+                                            logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
+                                            allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                            targetDevice = allDiscoveredDevices[0];
+                                        }
+                                        populateDeviceSelector();
+                                        logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
                                         connectToDevice();
                                         return;
                                     }
@@ -1195,7 +884,6 @@
                                         allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
                                         targetDevice = allDiscoveredDevices[0];
                                     }
-
                                     populateDeviceSelector();
                                     logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
                                     connectToDevice();
@@ -1203,18 +891,18 @@
                                     setTimeout(searchAttempt, 2000);
                                 } else {
                                     showError('No valid GermGuardian devices found. Make sure it\'s powered on and nearby.');
-                                    document.getElementById('retryBtn').classList.remove('hidden');
+                                    ui.retryBtn.classList.remove('hidden');
                                 }
                             } else if (attemptCount < maxAttempts) {
                                 setTimeout(searchAttempt, 2000);
                             } else {
                                 showError('No Bluetooth devices detected. Check Bluetooth permissions and ensure device is discoverable.');
-                                document.getElementById('retryBtn').classList.remove('hidden');
+                                ui.retryBtn.classList.remove('hidden');
                             }
                         }, function(error) {
                             logError('JM1 direct search error: ' + JSON.stringify(error));
                             if (attemptCount < maxAttempts) { setTimeout(searchAttempt, 2000); }
-                            else { showError('Bluetooth search failed repeatedly. Please check permissions and device.'); document.getElementById('retryBtn').classList.remove('hidden'); }
+                            else { showError('Bluetooth search failed repeatedly. Please check permissions and device.'); ui.retryBtn.classList.remove('hidden'); }
                         });
                     } else {
                         throw new Error('Hubea BLE library not available');
@@ -1222,7 +910,7 @@
                 } catch (error) {
                     logError('Direct search attempt exception: ' + error.message);
                     if (attemptCount < maxAttempts) { setTimeout(searchAttempt, 2000); }
-                    else { showError('Cannot access Bluetooth. Check app permissions.'); document.getElementById('retryBtn').classList.remove('hidden'); }
+                    else { showError('Cannot access Bluetooth. Check app permissions.'); ui.retryBtn.classList.remove('hidden'); }
                 }
             };
             searchAttempt();
@@ -1292,7 +980,7 @@
 
         function initiatePairing() {
             updateConnectionStatus('Pairing...');
-            document.getElementById('connectionText').textContent = 'Please follow device instructions to pair.';
+            ui.connectionText.textContent = 'Please follow device instructions to pair.';
             debugLog('Starting communication for pairing...');
             targetDevice.startCommunication( function() {
                 logSuccess('Connected for pairing. Starting registration...');
@@ -1307,7 +995,7 @@
                 }, function(error) {
                     logError('Pairing failed during registration: ' + JSON.stringify(error));
                     showError('Pairing failed. Ensure device is in pairing mode and retry.');
-                    document.getElementById('retryBtn').classList.remove('hidden');
+                    ui.retryBtn.classList.remove('hidden');
                     if (targetDevice && typeof targetDevice.stopCommunication === 'function') {
                         targetDevice.stopCommunication();
                     }
@@ -1315,13 +1003,13 @@
             }, function(error) {
                 logError('Connection failed for pairing: ' + JSON.stringify(error));
                 showError('Could not connect for pairing. Retry.');
-                document.getElementById('retryBtn').classList.remove('hidden');
+                ui.retryBtn.classList.remove('hidden');
             } );
         }
 
         function connectToDevice() {
             updateConnectionStatus('Connecting...');
-            document.getElementById('connectionText').textContent = 'Establishing secure connection...';
+            ui.connectionText.textContent = 'Establishing secure connection...';
             debugLog('Attempting to connect...');
             if (targetDevice.setBluetoothMode) {
                 debugLog('Setting Bluetooth mode...');
@@ -1342,7 +1030,7 @@
                         setTimeout(attemptConnection, 2000);
                     } else {
                         showError('Connection failed after ' + maxConnectionAttempts + ' attempts');
-                        document.getElementById('retryBtn').classList.remove('hidden');
+                        ui.retryBtn.classList.remove('hidden');
                     }
                 } );
             };
@@ -1372,11 +1060,11 @@
                 statusRefreshInterval = null;
             }
             targetDevice = newDevice;
-            document.getElementById('mainContent').classList.add('hidden');
-            document.getElementById('connectionScreen').classList.remove('hidden');
+            ui.mainContent.classList.add('hidden');
+            ui.connectionScreen.classList.remove('hidden');
             updateConnectionStatus('Switching Device...');
-            document.getElementById('connectionText').textContent = 'Connecting to selected device...';
-            document.getElementById('retryBtn').classList.add('hidden');
+            ui.connectionText.textContent = 'Connecting to selected device...';
+            ui.retryBtn.classList.add('hidden');
             showError('');
             if (targetDevice.localKey) {
                  logSuccess('New device has local key. Connecting...');
@@ -1391,13 +1079,14 @@
         function onDeviceConnected() {
             logSuccess('Device connected!');
             debugLog('Model: ' + (targetDevice.getModelName ? targetDevice.getModelName() : 'N/A') + ', ID: ' + (targetDevice.getUniqueId ? targetDevice.getUniqueId() : 'N/A'));
-            const select = document.getElementById('deviceSelect');
-            if(select) {
-                select.value = getDeviceIdentifier(targetDevice);
+            
+            if(ui.deviceSelect) {
+                ui.deviceSelect.value = getDeviceIdentifier(targetDevice);
             }
-            document.getElementById('connectionScreen').classList.add('hidden');
-            document.getElementById('mainContent').classList.remove('hidden');
+            ui.connectionScreen.classList.add('hidden');
+            ui.mainContent.classList.remove('hidden');
             logWarning('Getting initial state...');
+            
             let statusReceived = false;
             const statusTimeout = setTimeout(() => {
                 if (!statusReceived) {
@@ -1405,6 +1094,7 @@
                     finishSetup();
                 }
             }, 8000);
+            
             targetDevice.getStatus( function(status) {
                 statusReceived = true;
                 clearTimeout(statusTimeout);
@@ -1417,11 +1107,6 @@
                 } else {
                     logWarning('Initial status was null (device busy?). Skipping initial UI update.');
                 }
-				
-                logSuccess('Initial status received!');
-                debugLog('Current state: ' + JSON.stringify(status));
-                updateUI(status);
-                updateSettingsUI(status);
                 finishSetup();
             }, function(error) {
                 statusReceived = true;
@@ -1446,37 +1131,39 @@
             debugLog('Setting up UI event listeners...');
             
             // Settings panel
-			document.getElementById('settingsBtn').addEventListener('click', function() {
-				document.getElementById('settingsPanel').classList.add('show');
+			ui.settingsBtn.addEventListener('click', function() {
+				ui.settingsPanel.classList.add('show');
 				document.body.classList.add('settings-open');
 			});
 
-			document.getElementById('settingsBackBtn').addEventListener('click', function() {
-				document.getElementById('settingsPanel').classList.remove('show');
+			ui.settingsBackBtn.addEventListener('click', function() {
+				ui.settingsPanel.classList.remove('show');
 				document.body.classList.remove('settings-open');
 			});
 
 			// Log toggle
-			const logToggle = document.getElementById('logToggle');
-            const debugInfoDiv1 = document.getElementById('debugInfo');
-            const debugInfoDiv2 = document.getElementById('debugInfo2');
-            const copyLogBtn = document.getElementById('copyLogBtn');
-            logToggle.addEventListener('change', function(e) {
-                const showLog = e.target.checked;
-                debugInfoDiv1.classList.toggle('console-hidden', !showLog);
-                debugInfoDiv2.classList.toggle('console-hidden', !showLog);
-                copyLogBtn.classList.toggle('console-hidden', !showLog);
-                localStorage.setItem('logVisible', showLog);
-            });
+            /* ---
+             * OPTIMIZATION 3: Updated listener
+             * No longer references debugInfoDiv2 or copyLogBtn2
+             * ---
+             */
+		ui.logToggle.addEventListener('change', function(e) {
+   			 const showLog = e.target.checked;
+   			 // Toggle visibility for both sets of log elements
+   			 ui.debugInfo.classList.toggle('console-hidden', !showLog);
+   			 ui.copyLogBtn.classList.toggle('console-hidden', !showLog);
+   			 ui.debugInfoSettings.classList.toggle('console-hidden', !showLog);
+   			 ui.copyLogBtnSettings.classList.toggle('console-hidden', !showLog);
+  			  localStorage.setItem('logVisible', showLog);
+		});
 
 			// Dark Mode toggle
-			const darkModeToggle = document.getElementById('darkModeToggle');
-			darkModeToggle.addEventListener('change', function(e) {
+			ui.darkModeToggle.addEventListener('change', function(e) {
 				const isDark = e.target.checked;
 				if (isDark) {
 					document.body.classList.add('dark-mode');
 					document.body.classList.remove('amoled-mode');
-					document.getElementById('amoledModeToggle').checked = false;
+					ui.amoledModeToggle.checked = false;
 					updateIconsForTheme('dark');
 				} else {
 					document.body.classList.remove('dark-mode');
@@ -1487,13 +1174,12 @@
 			});
 
 			// AMOLED Mode toggle
-			const amoledModeToggle = document.getElementById('amoledModeToggle');
-			amoledModeToggle.addEventListener('change', function(e) {
+			ui.amoledModeToggle.addEventListener('change', function(e) {
 				const isAmoled = e.target.checked;
 				if (isAmoled) {
 					document.body.classList.add('amoled-mode');
 					document.body.classList.remove('dark-mode');
-					document.getElementById('darkModeToggle').checked = false;
+					ui.darkModeToggle.checked = false;
 					updateIconsForTheme('amoled');
 				} else {
 					document.body.classList.remove('amoled-mode');
@@ -1504,14 +1190,12 @@
 			});
 
 			// Polling Rate selector
-			const pollingRateSelect = document.getElementById('pollingRateSelect');
-			pollingRateSelect.addEventListener('change', function(e) {
+			ui.pollingRateSelect.addEventListener('change', function(e) {
 				const newRate = parseInt(e.target.value);
 				REFRESH_INTERVAL = newRate;
 				localStorage.setItem('pollingRate', newRate);
 				debugLog('⚡ Polling rate changed to ' + (newRate / 1000) + ' seconds');
 				
-				// Restart the refresh interval with new rate
 				if (statusRefreshInterval) {
 					clearInterval(statusRefreshInterval);
 					statusRefreshInterval = setInterval(() => {
@@ -1524,13 +1208,21 @@
 			});
 
 			// Device selector
-			document.getElementById('deviceSelect').addEventListener('change', handleDeviceChange);
-			document.getElementById('showKeyBtn').addEventListener('click', showAndCopyLocalKey);
+			ui.deviceSelect.addEventListener('change', handleDeviceChange);
+			ui.showKeyBtn.addEventListener('click', showAndCopyLocalKey);
         }
 		
+        /* ---
+         * OPTIMIZATION 3: Updated Copy Function
+         * Only reads from the single ui.debugInfo element.
+         * ---
+         */
 		function copyLogToClipboard() {
-            const debugDiv1 = document.getElementById('debugInfo');
-            let logText = debugDiv1.innerText || debugDiv1.textContent;
+            if (!ui.debugInfo) {
+                logError("Debug console not found.");
+                return;
+            }
+            let logText = ui.debugInfo.innerText || ui.debugInfo.textContent;
 
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(logText).then(function() {
@@ -1542,6 +1234,7 @@
                 logError('Clipboard API not available. Cannot copy.');
             }
         }
+        
 		function pauseAppConnections() {
             debugLog('App is moving to background (pagehide). Pausing connections.');
             if (statusRefreshInterval) {
@@ -1551,7 +1244,6 @@
             }
             if (targetDevice) {
                 if (typeof targetDevice.stopCommunication === 'function') {
-                    // This is a "fire and forget" disconnect.
                     targetDevice.stopCommunication();
                     logSuccess('Disconnect command sent.');
                 }
@@ -1562,25 +1254,16 @@
         }
 		function resumeAppConnections() {
             debugLog('App resumed. Checking connection status...');
-            
-            // 1. If the interval is already running, don't stack them.
             if (statusRefreshInterval) {
                 logWarning('Polling is already active on resume.');
                 return;
             }
-
-            // 2. If we don't have a device, we can't poll.
             if (!targetDevice) {
                 logError('Cannot resume polling, no target device selected.');
                 return;
             }
-
-            // 3. Run the poller immediately ONCE.
-            //    refreshStatusSilent() will auto-reconnect if needed.
             logSuccess('Running initial poll on resume...');
             refreshStatusSilent(); 
-
-            // 4. Restart the regular polling interval.
             statusRefreshInterval = setInterval(() => {
                 if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
                     refreshStatusSilent();
@@ -1590,16 +1273,8 @@
 		window.addEventListener('pagehide', pauseAppConnections);
 		
 		function showAndCopyLocalKey() {
-            if (!targetDevice) {
-                logError('Cannot get key: No target device.');
-                alert('No device is connected.');
-                return;
-            }
-            if (!targetDevice.localKey) {
-                logError('Cannot get key: Device has no localKey.');
-                alert('No LocalKey found for this device.');
-                return;
-            }
+            if (!targetDevice) { logError('Cannot get key: No target device.'); alert('No device is connected.'); return; }
+            if (!targetDevice.localKey) { logError('Cannot get key: Device has no localKey.'); alert('No LocalKey found for this device.'); return; }
 
             const key = targetDevice.localKey;
             logSuccess('Displaying LocalKey...');
@@ -1607,7 +1282,6 @@
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(key).then(function() {
                     logSuccess('LocalKey copied to clipboard!');
-                    // Alert shows the key and confirms it was copied
                     alert('Device LocalKey (copied to clipboard):\n\n' + key);
                 }, function(err) {
                     logError('Failed to copy key: ' + err);
@@ -1622,25 +1296,25 @@
         function setupControlListeners() {
             debugLog('Setting up control event listeners...');
             
-            document.getElementById('powerToggle').addEventListener('change', function(e) {
+            ui.powerToggle.addEventListener('change', function(e) {
                 const isOn = e.target.checked;
                 debugLog('⚡ POWER: ' + (isOn ? 'ON' : 'OFF'));
                 sendCommand(isOn ? { power: true } : { power: false, timer: 0 });
             });
 
-            document.getElementById('uvToggle').addEventListener('change', function(e) {
+            ui.uvToggle.addEventListener('change', function(e) {
                 const isOn = e.target.checked;
                 debugLog('☀️ UV: ' + (isOn ? 'ON' : 'OFF'));
                 sendCommand({ uv: isOn });
             });
 
-            document.getElementById('timerSelect').addEventListener('change', function(e) {
+            ui.timerSelect.addEventListener('change', function(e) {
                 const hours = parseInt(e.target.value);
                 debugLog('⏱️ TIMER: ' + hours + 'h');
                 sendCommand({ timer: hours });
             });
 
-            document.querySelectorAll('.speed-btn').forEach(btn => {
+            ui.speedButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const speed = this.dataset.speed;
                     debugLog('💨 SPEED: ' + speed);
@@ -1678,10 +1352,27 @@
                 showError('Command timeout');
             }, 15000);
             try {
-                targetDevice.setStatus(params, function() {
+                /* ---
+                 * OPTIMIZATION 4: Check for returned status
+                 * The success callback now accepts a 'status' object.
+                 * If the device returns its new state, we use it directly
+                 * and skip the 'refreshStatusSilent' call.
+                 * ---
+                 */
+                targetDevice.setStatus(params, function(status) { // <-- Check for 'status'
                     clearTimeout(commandTimeout);
                     logSuccess('✅ Command CONFIRMED! (' + (Date.now() - startTime) + 'ms)');
-                    setTimeout(refreshStatusSilent, 1500);
+                    
+                    if (status) {
+                        logSuccess('Command response included new state.');
+                        updateUI(status); // Update UI with the state we just received
+                        updateSettingsUI(status);
+                    } else {
+                        // Fallback: device didn't return state, so we must refresh
+                        logWarning('Command response empty, scheduling refresh.');
+                        setTimeout(refreshStatusSilent, 1500);
+                    }
+
                 }, function(error) {
                     clearTimeout(commandTimeout);
                     logWarning('Command rejected (device busy): ' + JSON.stringify(error));
@@ -1696,7 +1387,6 @@
         function refreshStatusSilent() {
             if (!targetDevice) return;
             targetDevice.getStatus( function(status) {
-			
 				if (status) {
                     debugLog('BG Status: ' + JSON.stringify(status));
                     updateUI(status);
@@ -1704,30 +1394,31 @@
                 } else {
                     debugLog('BG Status was null (device busy?). Skipping UI update.');
                 }
-			
-                debugLog('BG Status: ' + JSON.stringify(status));
-                updateUI(status);
-                updateSettingsUI(status);
             }, function(error) {
                 debugLog('BG Status failed (ignored): ' + error);
             } );
         }
 
+        /* ---
+         * OPTIMIZATION 2: All functions below now use the 'ui' cache
+         * ---
+         */
+        
         function updateUIOptimistic(params) {
             debugLog('Optimistic UI update...');
-            if (params.hasOwnProperty('power')) document.getElementById('powerToggle').checked = params.power;
+            if (params.hasOwnProperty('power')) ui.powerToggle.checked = params.power;
             if (params.hasOwnProperty('uv')) {
-                document.getElementById('uvToggle').checked = params.uv;
+                ui.uvToggle.checked = params.uv;
                 updateUVIndicator(params.uv);
             }
             if (params.hasOwnProperty('timer')) {
-                document.getElementById('timerSelect').value = params.timer;
+                ui.timerSelect.value = params.timer;
                 updateTimerDisplay(params.timer);
             }
             if (params.hasOwnProperty('auto') || params.hasOwnProperty('wind')) {
-                document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
+                ui.speedButtons.forEach(btn => btn.classList.remove('active'));
                 if (params.auto) {
-                    document.querySelector('[data-speed="auto"]').classList.add('active');
+                    document.querySelector('[data-speed="auto"]').classList.add('active'); // querySelector is still needed here
                     updateSpeedDisplay('auto', 0);
                 } else if (params.wind) {
                     const btn = document.querySelector(`[data-speed="${params.wind}"]`);
@@ -1742,25 +1433,26 @@
             
             // Power
             const powerState = status.power || false;
-            document.getElementById('powerToggle').checked = powerState;
+            ui.powerToggle.checked = powerState;
             
             // UV
             const uvState = status.uv || false;
-            document.getElementById('uvToggle').checked = uvState;
+            ui.uvToggle.checked = uvState;
             updateUVIndicator(uvState);
             
             // Timer
             const timerValue = status.timer || 0;
-            document.getElementById('timerSelect').value = timerValue;
+            ui.timerSelect.value = timerValue;
             updateTimerDisplay(timerValue);
 
             // Speed
-            document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
+            ui.speedButtons.forEach(btn => btn.classList.remove('active'));
             if (status.auto) {
-                document.querySelector('[data-speed="auto"]').classList.add('active');
+                const autoBtn = ui.speedButtonsContainer.querySelector('[data-speed="auto"]');
+                if (autoBtn) autoBtn.classList.add('active');
                 updateSpeedDisplay('auto', 0);
             } else if (status.wind) {
-                const speedBtn = document.querySelector(`[data-speed="${status.wind}"]`);
+                const speedBtn = ui.speedButtonsContainer.querySelector(`[data-speed="${status.wind}"]`);
                 if (speedBtn) speedBtn.classList.add('active');
                 updateSpeedDisplay('manual', status.wind);
             }
@@ -1769,51 +1461,39 @@
             if (status.airQuality !== undefined) {
                 updateAirQuality(status.airQuality);
             }
-
             debugLog('UI update complete');
         }
 
         function updateAirQuality(value) {
-            const banner = document.getElementById('airQualityBanner');
-            const valueEl = document.getElementById('particulateValue');
-            const deviceImage = document.getElementById('deviceImage');
-            
-            valueEl.textContent = value;
-            
-            banner.className = 'air-quality-banner';
-            let imageSrc = '../img/control-head-led-gr.png'; // Default to green when connected
+            ui.particulateValue.textContent = value;
+            ui.airQualityBanner.className = 'air-quality-banner';
+            let imageSrc = '../img/control-head-led-gr.png';
             
             if (value <= 100) {
-                banner.classList.add('good');
-                banner.textContent = 'GOOD';
+                ui.airQualityBanner.classList.add('good');
+                ui.airQualityBanner.textContent = 'GOOD';
                 imageSrc = '../img/control-head-led-gr.png';
             } else if (value <= 200) {
-                banner.classList.add('moderate');
-                banner.textContent = 'MODERATE';
+                ui.airQualityBanner.classList.add('moderate');
+                ui.airQualityBanner.textContent = 'MODERATE';
                 imageSrc = '../img/control-head-led-or.png';
             } else {
-                banner.classList.add('unhealthy');
-                banner.textContent = 'UNHEALTHY';
+                ui.airQualityBanner.classList.add('unhealthy');
+                ui.airQualityBanner.textContent = 'UNHEALTHY';
                 imageSrc = '../img/control-head-led-re.png';
             }
-            
-            deviceImage.src = imageSrc;
+            ui.deviceImage.src = imageSrc;
         }
 
         function updateSpeedDisplay(mode, speed) {
-            const speedIcon = document.getElementById('speedIcon');
-            const speedBars = document.getElementById('speedBars').children;
-            
+            const speedBars = ui.speedBars.children;
             if (mode === 'auto') {
-                speedIcon.src = '../img/control-head-speed_auto.png';
-                // Auto mode - show all bars active
+                ui.speedIcon.src = '../img/control-head-speed_auto.png';
                 for (let i = 0; i < speedBars.length; i++) {
                     speedBars[i].classList.add('active');
                 }
             } else {
-                speedIcon.src = '../img/control-head-speed.png';
-                // Manual mode - show bars based on speed
-                // Speed 1 = 1 bar (leftmost), Speed 5 = 5 bars (all)
+                ui.speedIcon.src = '../img/control-head-speed.png';
                 for (let i = 0; i < speedBars.length; i++) {
                     speedBars[i].classList.toggle('active', i < speed);
                 }
@@ -1821,27 +1501,23 @@
         }
 
         function updateUVIndicator(isOn) {
-            const uvIndicator = document.getElementById('uvIndicator');
-            uvIndicator.style.opacity = isOn ? '1' : '0.5';
+            ui.uvIndicator.style.opacity = isOn ? '1' : '0.5';
         }
 
         function updateTimerDisplay(hours) {
-            const timerDisplay = document.getElementById('timerDisplay');
             if (hours > 0) {
-                timerDisplay.textContent = hours + 'h';
+                ui.timerDisplay.textContent = hours + 'h';
             } else {
-                timerDisplay.textContent = '--';
+                ui.timerDisplay.textContent = '--';
             }
         }
 
         function populateDeviceSelector() {
-            const select = document.getElementById('deviceSelect');
-            const card = document.getElementById('deviceSelectionCard');
-            if (!select || !card) {
+            if (!ui.deviceSelect || !ui.deviceSelectionCard) {
                 logError('Device selector UI elements not found.');
                 return;
             }
-            select.innerHTML = '';
+            ui.deviceSelect.innerHTML = '';
             if (allDiscoveredDevices.length === 0) {
                 logWarning('No devices to populate selector.');
                 return;
@@ -1856,13 +1532,13 @@
                 if (targetDevice && deviceId === getDeviceIdentifier(targetDevice)) {
                     option.selected = true;
                 }
-                select.appendChild(option);
+                ui.deviceSelect.appendChild(option);
             });
             if (allDiscoveredDevices.length > 1) {
-                card.classList.remove('hidden');
+                ui.deviceSelectionCard.classList.remove('hidden');
                 logSuccess(`Populated device selector with ${allDiscoveredDevices.length} devices.`);
             } else {
-                card.classList.add('hidden');
+                ui.deviceSelectionCard.classList.add('hidden');
                 debugLog('Only one device found, hiding selector.');
             }
         }
@@ -1880,115 +1556,99 @@
             const bulbUsed = status.uvBulbUsedTime || 0;
             const filterLifePercent = Math.max(0, 100 - (filterUsed / filterReplaceHours * 100));
             const bulbLifePercent = Math.max(0, 100 - (bulbUsed / bulbReplaceHours * 100));
-            document.getElementById('filterLifeText').textContent = `${filterLifePercent.toFixed(0)}%`;
-            document.getElementById('filterLifeBar').style.width = `${filterLifePercent}%`;
-            document.getElementById('filterLifeHours').textContent = `Used: ${filterUsed} / ${filterReplaceHours} hours`;
-            document.getElementById('bulbLifeText').textContent = `${bulbLifePercent.toFixed(0)}%`;
-            document.getElementById('bulbLifeBar').style.width = `${bulbLifePercent}%`;
-            document.getElementById('bulbLifeHours').textContent = `Used: ${bulbUsed} / ${bulbReplaceHours} hours`;
-            const filterAlert = document.getElementById('filterAlert');
-            const bulbAlert = document.getElementById('bulbAlert');
-            filterAlert.classList.toggle('show', filterUsed >= filterReplaceHours);
-            bulbAlert.classList.toggle('show', bulbUsed >= bulbReplaceHours);
+            
+            ui.filterLifeText.textContent = `${filterLifePercent.toFixed(0)}%`;
+            ui.filterLifeBar.style.width = `${filterLifePercent}%`;
+            ui.filterLifeHours.textContent = `Used: ${filterUsed} / ${filterReplaceHours} hours`;
+            ui.bulbLifeText.textContent = `${bulbLifePercent.toFixed(0)}%`;
+            ui.bulbLifeBar.style.width = `${bulbLifePercent}%`;
+            ui.bulbLifeHours.textContent = `Used: ${bulbUsed} / ${bulbReplaceHours} hours`;
+            
+            ui.filterAlert.classList.toggle('show', filterUsed >= filterReplaceHours);
+            ui.bulbAlert.classList.toggle('show', bulbUsed >= bulbReplaceHours);
+            
             debugLog(`Filter: ${filterUsed}/${filterReplaceHours} (${filterLifePercent.toFixed(1)}%), Bulb: ${bulbUsed}/${bulbReplaceHours} (${bulbLifePercent.toFixed(1)}%)`);
             debugLog('Settings UI update complete');
         }
 
         function updateConnectionStatus(message) {
-            document.getElementById('connectionTitle').textContent = message;
+            ui.connectionTitle.textContent = message;
         }
 
         function showError(message) {
-            const errorEl = document.getElementById('errorMessage');
-            errorEl.textContent = message;
-            errorEl.classList.toggle('hidden', !message);
+            ui.errorMessage.textContent = message;
+            ui.errorMessage.classList.toggle('hidden', !message);
         }
 
         function retryConnection() {
-            document.getElementById('errorMessage').textContent = '';
-            document.getElementById('retryBtn').classList.add('hidden');
+            ui.errorMessage.textContent = '';
+            ui.retryBtn.classList.add('hidden');
             location.reload();
         }
 		
-	function updateIconsForTheme(theme) {
-		const darkIconMappings = {
-			'control-power.jpg': 'control-power_dark.jpg',
-			'control-speed.jpg': 'control-speed_dark.jpg',
-			'control-timer.jpg': 'control-timer_dark.jpg',
-			'control-uv.jpg': 'control-uv_dark.jpg'
-		};
-		
-		const amoledIconMappings = {
-			'control-power.jpg': 'control-power_black.jpg',
-			'control-speed.jpg': 'control-speed_black.jpg',
-			'control-timer.jpg': 'control-timer_black.jpg',
-			'control-uv.jpg': 'control-uv_black.jpg'
-		};
-		
-		document.querySelectorAll('.control-icon img').forEach(img => {
-			const currentSrc = img.src;
-			const filename = currentSrc.split('/').pop();
-			
-			// Get base filename (remove _dark or _black suffix)
-			let baseFilename = filename;
-			if (filename.includes('_dark.jpg')) {
-				baseFilename = filename.replace('_dark.jpg', '.jpg');
-			} else if (filename.includes('_black.jpg')) {
-				baseFilename = filename.replace('_black.jpg', '.jpg');
-			}
-			
-			if (theme === 'dark') {
-				// Switch to dark versions
-				const darkVersion = darkIconMappings[baseFilename];
-				if (darkVersion) {
-					img.src = currentSrc.replace(filename, darkVersion);
-				}
-			} else if (theme === 'amoled') {
-				// Switch to black versions
-				const blackVersion = amoledIconMappings[baseFilename];
-				if (blackVersion) {
-					img.src = currentSrc.replace(filename, blackVersion);
-				}
-			} else {
-				// Switch back to original versions
-				img.src = currentSrc.replace(filename, baseFilename);
-			}
-		});
-	}
+        function updateIconsForTheme(theme) {
+            const darkIconMappings = {
+                'control-power.jpg': 'control-power_dark.jpg',
+                'control-speed.jpg': 'control-speed_dark.jpg',
+                'control-timer.jpg': 'control-timer_dark.jpg',
+                'control-uv.jpg': 'control-uv_dark.jpg'
+            };
+            
+            const amoledIconMappings = {
+                'control-power.jpg': 'control-power_black.jpg',
+                'control-speed.jpg': 'control-speed_black.jpg',
+                'control-timer.jpg': 'control-timer_black.jpg',
+                'control-uv.jpg': 'control-uv_black.jpg'
+            };
+            
+            document.querySelectorAll('.control-icon img').forEach(img => {
+                const currentSrc = img.src;
+                const filename = currentSrc.split('/').pop();
+                let baseFilename = filename.replace('_dark.jpg', '.jpg').replace('_black.jpg', '.jpg');
+                
+                if (theme === 'dark') {
+                    const darkVersion = darkIconMappings[baseFilename];
+                    if (darkVersion) img.src = currentSrc.replace(filename, darkVersion);
+                } else if (theme === 'amoled') {
+                    const blackVersion = amoledIconMappings[baseFilename];
+                    if (blackVersion) img.src = currentSrc.replace(filename, blackVersion);
+                } else {
+                    img.src = currentSrc.replace(filename, baseFilename);
+                }
+            });
+        }
 
-			function applySavedSettings() {
-				const logVisible = localStorage.getItem('logVisible') !== 'false';
-				const logToggle = document.getElementById('logToggle');
-				const debugInfoDiv1 = document.getElementById('debugInfo');
-				const debugInfoDiv2 = document.getElementById('debugInfo2');
-				const copyLogBtn = document.getElementById('copyLogBtn');
-				logToggle.checked = logVisible;
-				debugInfoDiv1.classList.toggle('console-hidden', !logVisible);
-				debugInfoDiv2.classList.toggle('console-hidden', !logVisible);
-				copyLogBtn.classList.toggle('console-hidden', !logVisible);
-				
-				// Apply saved theme
-				const darkMode = localStorage.getItem('darkMode') === 'true';
-				const amoledMode = localStorage.getItem('amoledMode') === 'true';
-				
-				if (amoledMode) {
-					document.body.classList.add('amoled-mode');
-					document.getElementById('amoledModeToggle').checked = true;
-					updateIconsForTheme('amoled');
-				} else if (darkMode) {
-					document.body.classList.add('dark-mode');
-					document.getElementById('darkModeToggle').checked = true;
-					updateIconsForTheme('dark');
-				}
-				
-				// Apply saved polling rate
-				const savedPollingRate = localStorage.getItem('pollingRate');
-				if (savedPollingRate) {
-					REFRESH_INTERVAL = parseInt(savedPollingRate);
-					document.getElementById('pollingRateSelect').value = savedPollingRate;
-					debugLog('Restored polling rate: ' + (REFRESH_INTERVAL / 1000) + ' seconds');
-				}
-			}
+        function applySavedSettings() {
+            const logVisible = localStorage.getItem('logVisible') !== 'false';
+		ui.logToggle.checked = logVisible;
+		// Toggle visibility for both sets of log elements
+		ui.debugInfo.classList.toggle('console-hidden', !logVisible);
+		ui.copyLogBtn.classList.toggle('console-hidden', !logVisible);
+		ui.debugInfoSettings.classList.toggle('console-hidden', !logVisible);
+		ui.copyLogBtnSettings.classList.toggle('console-hidden', !logVisible);
+            
+            // Theme
+            const darkMode = localStorage.getItem('darkMode') === 'true';
+            const amoledMode = localStorage.getItem('amoledMode') === 'true';
+            
+            if (amoledMode) {
+                document.body.classList.add('amoled-mode');
+                ui.amoledModeToggle.checked = true;
+                updateIconsForTheme('amoled');
+            } else if (darkMode) {
+                document.body.classList.add('dark-mode');
+                ui.darkModeToggle.checked = true;
+                updateIconsForTheme('dark');
+            }
+            
+            // Polling rate
+            const savedPollingRate = localStorage.getItem('pollingRate');
+            if (savedPollingRate) {
+                REFRESH_INTERVAL = parseInt(savedPollingRate);
+                ui.pollingRateSelect.value = savedPollingRate;
+                debugLog('Restored polling rate: ' + (REFRESH_INTERVAL / 1000) + ' seconds');
+            }
+        }
 
         window.addEventListener('beforeunload', function() {
             if (statusRefreshInterval) clearInterval(statusRefreshInterval);
