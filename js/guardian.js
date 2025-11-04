@@ -4674,27 +4674,10 @@
   }
 
 // --- PATCHED 10.31.2025 ---
-  $._getInstallId = function() {
-    return $.Deferred(function($dfd) {
-      
-      // Add a 5-second timeout.
-      const installIdTimeout = setTimeout(() => {
-          console.warn('$._getInstallId() timed out. Continuing without native installId.');
-          $dfd.resolve(null); // Resolve with null instead of hanging
-      }, 1000); 
-
-      try {
-        hubea.app.getInstallId(function(id) {
-          clearTimeout(installIdTimeout); // Success! Clear the timeout.
-          $dfd.resolve(id);
-        });
-      } catch (e) {
-        clearTimeout(installIdTimeout); // Error! Clear the timeout.
-        console.error('Error in $._getInstallId catch: ' + e.message);
-        $dfd.reject(e);
-      }
-    });
-  }
+	$._getInstallId = function() {
+		console.warn('$._getInstallId() SKIPPED. Assuming timeout and resolving with null.');
+		return $._resolveAction(null);
+	}
 
   $._getScenarioId = function() {
     return $.Deferred(function($dfd) {
