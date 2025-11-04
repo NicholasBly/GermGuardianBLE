@@ -4681,7 +4681,7 @@
       const installIdTimeout = setTimeout(() => {
           console.warn('$._getInstallId() timed out. Continuing without native installId.');
           $dfd.resolve(null); // Resolve with null instead of hanging
-      }, 5000); 
+      }, 1000); 
 
       try {
         hubea.app.getInstallId(function(id) {
