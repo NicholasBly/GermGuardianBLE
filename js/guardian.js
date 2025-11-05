@@ -3430,21 +3430,7 @@
    * @return 変更成功したかどうか
    */
   Purifier.prototype.setBluetoothMode = function(enabled) {
-    if (!this.isRegistered()) {
-      this.error('This device is not registered.');
       return false;
-    }
-    if (enabled) {
-      this.guardian._disconnectOnCloud(this);
-    } else {
-      this._stopDataCommunication(true);
-      if (this.btMode) {
-        // BLE->WiFiモード設定直後は一回サーバーへconnected確認が必要
-        this.wifiAck = false;
-      }
-    }
-    this.btMode = (enabled == true);
-    return true;
   }
 
   /**
