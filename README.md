@@ -3,14 +3,21 @@
 <!--<img width="150" height="327" alt="IMG_5295" src="https://github.com/user-attachments/assets/5c5b381d-5cc8-447d-9f06-12ec1c5f344d" />
 
 <img width="150" height="327" alt="IMG_5293" src="https://github.com/user-attachments/assets/c06d6461-cd4c-4aba-9c0e-3ac511de8e0f" />-->
-<img width="150" height="327" alt="IMG_5346" src="https://github.com/user-attachments/assets/a80e6209-cab4-4bed-9a59-f0f7ef1746cd" />
+<!--<img width="150" height="327" alt="IMG_5346" src="https://github.com/user-attachments/assets/a80e6209-cab4-4bed-9a59-f0f7ef1746cd" />
 
 <img width="150" height="327" alt="IMG_5345" src="https://github.com/user-attachments/assets/78cecea3-21fb-45bc-b714-10ac0e5df39d" />
 
 <img width="150" height="327" alt="IMG_5343" src="https://github.com/user-attachments/assets/f95a7c87-1e4c-45cc-99aa-989244ed9ea0" />
 
-<img width="150" height="327" alt="IMG_5347" src="https://github.com/user-attachments/assets/aca386bb-6e4e-478c-8adc-35f524395886" />
+<img width="150" height="327" alt="IMG_5347" src="https://github.com/user-attachments/assets/aca386bb-6e4e-478c-8adc-35f524395886" />-->
 
+<img width="150" height="327" alt="IMG_6761" src="https://github.com/user-attachments/assets/b1c982e2-80a2-48e9-b9c3-6e74b88b3e36" />
+
+<img width="150" height="327" alt="IMG_6760" src="https://github.com/user-attachments/assets/a526ddbf-715c-4773-8e62-59960ea4f914" />
+
+<img width="150" height="327" alt="IMG_6759" src="https://github.com/user-attachments/assets/15a3de8a-9f3d-48ba-8b19-4f480729397d" />
+
+<img width="150" height="327" alt="IMG_6762" src="https://github.com/user-attachments/assets/100a8f6a-338b-4cd8-873b-3832238d2860" />
 
 
 When the iOS app was discontinued, the app became useless because the web servers were shut down, leaving a white blank page. This led to the local bluetooth capability to be unavailable.
