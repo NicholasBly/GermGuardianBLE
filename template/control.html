@@ -1462,12 +1462,24 @@
 
 		// Update refreshStatusSilent to accept a callback
 		function refreshStatusSilent(onComplete) {
-			if (!targetDevice) { if(onComplete) onComplete(); return; }
-			targetDevice.getStatus(
-				(status) => { /* update UI */ if(onComplete) onComplete(); },
-				(error) => { /* handle error */ if(onComplete) onComplete(); }
-			);
+		if (!targetDevice) { 
+			if(onComplete) onComplete(); 
+			return; 
 		}
+		targetDevice.getStatus(
+			(status) => { 
+				if (status) {
+					updateUI(status);
+					updateSettingsUI(status);
+				}
+				if (onComplete) onComplete(); 
+			},
+			(error) => { 
+				logWarning('Silent refresh failed: ' + error);
+				if (onComplete) onComplete(); 
+			}
+		);
+	}
         
         function updateUIOptimistic(params) {
             debugLog('Optimistic UI update...');
