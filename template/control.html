@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GermGuardian Control</title>
     <style>
-        /* --- 
-         * OPTIMIZATION 1: CSS Variables (Custom Properties)
-         * All theme colors are defined here. Light mode is the default.
-         * The .dark-mode and .amoled-mode classes just override these variables.
-         * This reduces CSS repetition by over 100 lines.
-         * --- 
-         */
         :root {
             --color-bg: #f5f5f5;
             --color-bg-secondary: white;
@@ -117,33 +110,73 @@
             background: linear-gradient(180deg, #5DADE2 0%, #3498DB 100%);
             padding: 20px;
             display: flex;
-            align-items: center;
+            justify-content: space-between;
+            align-items: stretch;
             gap: 15px;
+            color: white;
         }
         .device-image-container { flex-shrink: 0; }
-        .device-image { width: 40px; height: auto; display: block; }
-        .control-display { flex: 1; color: white; }
-        .particulate-matter { margin-bottom: 15px; }
+        .device-image { 
+            width: 45px;
+            height: auto; 
+            display: block; 
+        }
+        .control-display {
+            flex: 1;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+        }
+		.status-left {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 15px;
+            flex: 1;
+        }
+        .status-right {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            flex: 1;
+            max-width: 180px;
+        }
+        .particulate-matter { margin-bottom: 0; }
         .particulate-label { font-size: 12px; opacity: 0.9; margin-bottom: 5px; }
-        .particulate-value { font-size: 36px; font-weight: bold; }
-        .control-indicators { display: flex; gap: 15px; align-items: center; }
+        .particulate-value { font-size: 36px; font-weight: bold; line-height: 1; }
+		
+		.device-speed-row {
+            display: flex;
+            align-items: flex-end; /* Locks the Purifier and Speed bars to the exact same baseline */
+            gap: 15px;
+        }
+        
         .speed-display { display: flex; align-items: flex-end; gap: 8px; }
-        .speed-icon, .uv-icon, .timer-icon { width: 32px; height: auto; }
+        .speed-icon, .uv-icon, .timer-icon, .filter-icon { width: 32px; height: auto; }
         .speed-bars { display: flex; align-items: flex-end; gap: 2px; height: 40px; }
         .speed-bar { width: 8px; background: rgba(255, 255, 255, 0.3); border-radius: 2px; }
         .speed-bar.active { background: white; }
-        .uv-indicator, .timer-indicator {
+
+        .uv-indicator, .timer-indicator, .filter-indicator {
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
             gap: 5px;
-            padding: 8px 12px;
+            padding: 8px;
             background: rgba(255, 255, 255, 0.2);
             border-radius: 8px;
+            text-align: center;
         }
-        .indicator-icon { width: 32px; height: 32px; font-size: 24px; }
+
+        .filter-indicator {
+            grid-column: 1 / 3;
+        }
+
+		.indicator-icon { width: 32px; height: 32px; font-size: 24px; display: flex; align-items: center; justify-content: center; }
         .indicator-label { font-size: 10px; text-transform: uppercase; opacity: 0.9; }
-        .indicator-value { font-size: 18px; font-weight: bold; }
+        .indicator-value { font-size: 18px; font-weight: bold; line-height: 1; }
 
         /* Controls Section */
         .controls-section {
@@ -399,17 +432,16 @@
         <div class="air-quality-banner" id="airQualityBanner">GOOD</div>
 
         <div class="control-area">
-            <div class="device-image-container">
-                <img src="../img/control-head-led.png" alt="Air Purifier" class="device-image" id="deviceImage">
-            </div>
-
-            <div class="control-display">
+            
+            <div class="status-left">
                 <div class="particulate-matter">
                     <div class="particulate-label">Particulate Matter</div>
                     <div class="particulate-value" id="particulateValue">--</div>
                 </div>
 
-                <div class="control-indicators">
+                <div class="device-speed-row">
+                    <img src="../img/control-head-led.png" alt="Air Purifier" class="device-image" id="deviceImage">
+                    
                     <div class="speed-display">
                         <img src="../img/control-head-speed.png" alt="Speed" class="speed-icon" id="speedIcon">
                         <div class="speed-bars" id="speedBars">
@@ -420,23 +452,37 @@
                             <div class="speed-bar" style="height: 40px;"></div>
                         </div>
                     </div>
-
-                    <div class="uv-indicator" id="uvIndicator">
-                        <div class="indicator-icon">
-							<img src="../img/control-head-uv.png" alt="UV" class="uv-icon" id="uvIcon">
-                        </div>
-                        <div class="indicator-label"></div>
-                    </div>
-
-                    <div class="timer-indicator">
-                        <div class="indicator-icon">
-                            <img src="../img/control-head-timer.png" alt="Timer" class="timer-icon" id="timerIcon">
-                        </div>
-                        <div class="indicator-label"></div>
-                        <div class="indicator-value" id="timerDisplay">--</div>
-                    </div>
                 </div>
             </div>
+
+            <div class="status-right">
+                <div class="uv-indicator" id="uvIndicator">
+                    <div class="indicator-icon">
+                        <img src="../img/control-head-uv.png" alt="UV" class="uv-icon" id="uvIcon">
+                    </div>
+                    <div class="indicator-label">UV Bulb</div>
+                    <div class="indicator-value" id="uvLifeDisplay">--%</div>
+                </div>
+
+                <div class="timer-indicator">
+                    <div class="indicator-icon">
+                        <img src="../img/control-head-timer.png" alt="Timer" class="timer-icon" id="timerIcon">
+                    </div>
+                    <div class="indicator-label">Timer</div>
+                    <div class="indicator-value" id="timerDisplay">--</div>
+                </div>
+                
+                <div class="filter-indicator" id="filterIndicator">
+                    <div class="indicator-icon">
+                        <img src="../img/control-head-filter.png" alt="Filter" class="filter-icon" id="filterIcon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <span style="font-size: 24px; display: none;">🌬️</span>
+                    </div>
+                    <div class="indicator-label">HEPA</div>
+                    <div class="indicator-value" id="filterLifeDisplay">--%</div>
+                </div>
+            </div>
+            
+        </div>
         </div>
 
         <div class="controls-section">
@@ -610,17 +656,13 @@
         ];
         let guardian = null;
         let targetDevice = null;
+		let setupFinished = false;
         let allDiscoveredDevices = [];
-        let statusRefreshInterval = null;
         let REFRESH_INTERVAL = 10000;
+		let commandTimeout = null;
+		let pendingParams = {};
+		let statusRefreshTimer = null;
 
-        /* ---
-         * OPTIMIZATION 2: DOM Element Cache
-         * This object will be populated on window.load.
-         * All functions will read from this cache instead of querying the DOM,
-         * which is much faster and saves battery.
-         * ---
-         */
         let ui = {};
 
 		const originalConsole = {
@@ -633,12 +675,6 @@
         };
         
         // --- Logging ---
-        /* ---
-         * OPTIMIZATION 3: Updated Logging
-         * - Only writes to one debug console (ui.debugInfo).
-         * - Checks if the log toggle is checked before doing any work to save CPU.
-         * ---
-         */
 	function debugLog(message, type = 'info') {
 	    originalConsole.log(message);
 
@@ -693,15 +729,38 @@
         ];
         function loadScript(src) { return new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.onload = () => resolve(); script.onerror = () => { debugLog('✗ Failed: ' + src); reject(); }; document.head.appendChild(script); }); }
         async function tryLoadScript(scriptInfo) { if (scriptInfo.test()) return true; for (const path of possiblePaths) { try { await loadScript(path + scriptInfo.file); if (scriptInfo.test()) return true; } catch (e) { } } return false; }
-        async function loadAllScripts() { debugLog('Starting script loading...'); for (const scriptInfo of requiredScripts) { const loaded = await tryLoadScript(scriptInfo); if (!loaded) throw new Error('Failed to load ' + scriptInfo.name); } logSuccess('All scripts loaded'); }
+		async function findValidBasePath() {
+			for (const path of possiblePaths) {
+				try {
+					await loadScript(path + 'jquery-2.1.4.min.js');
+					if (typeof jQuery !== 'undefined') return path;
+				} catch (e) { /* ignore 404s */ }
+			}
+			throw new Error('Could not resolve script path');
+		}
+
+		async function loadAllScripts() {
+			debugLog('Resolving script path...');
+			const basePath = await findValidBasePath();
+			debugLog(`Base path found: ${basePath}`);
+			
+			// Load remaining scripts sequentially from the known good path
+			const remainingScripts = [
+				{ name: 'hubea', file: 'hubea-r8533.js', test: () => typeof hubea !== 'undefined' },
+				{ name: 'aspe', file: 'aspe.js', test: () => typeof ASPE !== 'undefined' },
+				{ name: 'guardian', file: 'guardian.js', test: () => typeof Guardian !== 'undefined' }
+			];
+
+			for (const scriptInfo of remainingScripts) {
+				if (!scriptInfo.test()) {
+					await loadScript(basePath + scriptInfo.file);
+				}
+			}
+			logSuccess('All scripts loaded');
+		}
 
         // --- Initialization ---
         window.addEventListener('load', async function() {
-            /* ---
-             * OPTIMIZATION 2: Populate the UI cache
-             * This happens ONCE, right after the DOM is loaded.
-             * ---
-             */
             ui = {
                 // Connection Screen
                 connectionScreen: document.getElementById('connectionScreen'),
@@ -721,8 +780,11 @@
                 speedBars: document.getElementById('speedBars'),
                 uvIndicator: document.getElementById('uvIndicator'),
                 uvIcon: document.getElementById('uvIcon'),
+				uvLifeDisplay: document.getElementById('uvLifeDisplay'),
                 timerIcon: document.getElementById('timerIcon'),
                 timerDisplay: document.getElementById('timerDisplay'),
+				filterIndicator: document.getElementById('filterIndicator'),
+                filterLifeDisplay: document.getElementById('filterLifeDisplay'),
                 
                 // Controls
                 powerToggle: document.getElementById('powerToggle'),
@@ -931,20 +993,32 @@
                     guardian.findDevices( function(devices) {
                         debugLog('Guardian found ' + devices.length + ' potential device(s)');
                         if (devices && devices.length > 0) {
-                            const validGuardianDevices = devices.filter(device => device.jm1Type === 93240); // 93240 is the Purifier jm1Type
+                            // Filter out the Gateway
+                            const validGuardianDevices = devices.filter(device => {
+                                if (device.jm1Type !== 93240) return false;
+                                // guardian.js incorrectly assigns jm1Type 93240 to Gateways if productCode is missing.
+                                // The native deviceId retains the true type (82567). Reject it.
+                                if (device.deviceId && device.deviceId.includes('82567')) {
+                                    debugLog('Filtered out misidentified Gateway device.');
+                                    return false;
+                                }
+                                return true;
+                            });
+                            
                             debugLog('Found ' + validGuardianDevices.length + ' valid Guardian device(s) via library.');
                             if (validGuardianDevices.length > 0) {
                                 allDiscoveredDevices = validGuardianDevices;
                                 logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
                                 const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
-                                    if (purifier) {
-                                        logSuccess('Found Purifier device (Directly). Selecting it.');
-                                        targetDevice = purifier;
-                                    } else {
-                                        logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
-                                        allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                        targetDevice = allDiscoveredDevices[0];
-                                    }
+                                if (purifier) {
+                                    logSuccess('Found Purifier device. Selecting it.');
+                                    targetDevice = purifier;
+                                } else {
+                                    logWarning('No Purifier found. Defaulting to strongest signal.');
+                                    allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                    targetDevice = allDiscoveredDevices[0];
+                                }
+                                
                                 if (targetDevice.localKey) {
                                     logSuccess('Local key found. Connecting...');
                                     connectToDevice();
@@ -1055,10 +1129,10 @@
                 debugLog('Stopping communication with old device...');
                 targetDevice.stopCommunication();
             }
-            if (statusRefreshInterval) {
-                clearInterval(statusRefreshInterval);
-                statusRefreshInterval = null;
-            }
+            if (statusRefreshTimer) {
+				clearTimeout(statusRefreshTimer);
+				statusRefreshTimer = null;
+			}
             targetDevice = newDevice;
             ui.mainContent.classList.add('hidden');
             ui.connectionScreen.classList.remove('hidden');
@@ -1066,15 +1140,28 @@
             ui.connectionText.textContent = 'Connecting to selected device...';
             ui.retryBtn.classList.add('hidden');
             showError('');
-            if (targetDevice.localKey) {
-                 logSuccess('New device has local key. Connecting...');
-                 connectToDevice();
-            } else {
-                 logWarning('New device needs pairing...');
-                 updateConnectionStatus('Pairing Required...');
-                 initiatePairing();
-            }
-        }
+            const proceedToNewDevice = () => {
+			targetDevice = newDevice;
+			if (targetDevice.localKey) {
+				logSuccess('New device has local key. Connecting...');
+				connectToDevice();
+			} else {
+				logWarning('New device needs pairing...');
+				updateConnectionStatus('Pairing Required...');
+				initiatePairing();
+			}
+		};
+
+		if (targetDevice && typeof targetDevice.stopCommunication === 'function') {
+			debugLog('Stopping communication with old device...');
+			targetDevice.stopCommunication(
+				() => proceedToNewDevice(), 
+				() => proceedToNewDevice() // Proceed even if disconnect errors out
+			);
+		} else {
+			proceedToNewDevice();
+		}
+	}
 
         function onDeviceConnected() {
             logSuccess('Device connected!');
@@ -1117,12 +1204,10 @@
         }
 
         function finishSetup() {
-             if (statusRefreshInterval) clearInterval(statusRefreshInterval);
-             statusRefreshInterval = setInterval(() => {
-                 if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
-                     refreshStatusSilent();
-                 }
-             }, REFRESH_INTERVAL);
+             if (setupFinished) return;
+             setupFinished = true;
+             
+			 startPolling();
              setupControlListeners();
              logSuccess('Ready!');
         }
@@ -1142,11 +1227,6 @@
 			});
 
 			// Log toggle
-            /* ---
-             * OPTIMIZATION 3: Updated listener
-             * No longer references debugInfoDiv2 or copyLogBtn2
-             * ---
-             */
 		ui.logToggle.addEventListener('change', function(e) {
    			 const showLog = e.target.checked;
    			 // Toggle visibility for both sets of log elements
@@ -1196,15 +1276,8 @@
 				localStorage.setItem('pollingRate', newRate);
 				debugLog('⚡ Polling rate changed to ' + (newRate / 1000) + ' seconds');
 				
-				if (statusRefreshInterval) {
-					clearInterval(statusRefreshInterval);
-					statusRefreshInterval = setInterval(() => {
-						if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
-							refreshStatusSilent();
-						}
-					}, REFRESH_INTERVAL);
-					logSuccess('Polling interval restarted with new rate');
-				}
+				startPolling();
+				logSuccess('Polling interval restarted with new rate');
 			});
 
 			// Device selector
@@ -1212,11 +1285,6 @@
 			ui.showKeyBtn.addEventListener('click', showAndCopyLocalKey);
         }
 		
-        /* ---
-         * OPTIMIZATION 3: Updated Copy Function
-         * Only reads from the single ui.debugInfo element.
-         * ---
-         */
 		function copyLogToClipboard() {
             if (!ui.debugInfo) {
                 logError("Debug console not found.");
@@ -1237,11 +1305,11 @@
         
 		function pauseAppConnections() {
             debugLog('App is moving to background (pagehide). Pausing connections.');
-            if (statusRefreshInterval) {
-                clearInterval(statusRefreshInterval);
-                statusRefreshInterval = null;
-                logSuccess('Polling stopped.');
-            }
+            if (statusRefreshTimer) {
+				clearTimeout(statusRefreshTimer);
+				statusRefreshTimer = null;
+				logSuccess('Polling stopped.');
+			}
             if (targetDevice) {
                 if (typeof targetDevice.stopCommunication === 'function') {
                     targetDevice.stopCommunication();
@@ -1254,21 +1322,16 @@
         }
 		function resumeAppConnections() {
             debugLog('App resumed. Checking connection status...');
-            if (statusRefreshInterval) {
-                logWarning('Polling is already active on resume.');
-                return;
-            }
+            if (statusRefreshTimer) {
+				logWarning('Polling is already active on resume.');
+				return;
+			}
             if (!targetDevice) {
                 logError('Cannot resume polling, no target device selected.');
                 return;
             }
             logSuccess('Running initial poll on resume...');
-            refreshStatusSilent(); 
-            statusRefreshInterval = setInterval(() => {
-                if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
-                    refreshStatusSilent();
-                }
-            }, REFRESH_INTERVAL);
+            refreshStatusSilent(() => startPolling());
         }
 		window.addEventListener('pagehide', pauseAppConnections);
 		
@@ -1314,34 +1377,42 @@
                 sendCommand({ timer: hours });
             });
 
-            ui.speedButtons.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const speed = this.dataset.speed;
-                    debugLog('💨 SPEED: ' + speed);
-                    let command = (speed === 'auto') ? { auto: true } : { auto: false, wind: parseInt(speed) };
-                    sendCommand(command);
-                });
+            ui.speedButtonsContainer.addEventListener('click', function(e) {
+                const btn = e.target.closest('.speed-btn');
+                if (!btn) return;
+                
+                const speed = btn.dataset.speed;
+                debugLog('💨 SPEED: ' + speed);
+                let command = (speed === 'auto') ? { auto: true } : { auto: false, wind: parseInt(speed) };
+                sendCommand(command);
             });
 
             logSuccess('Control listeners configured');
         }
 
         function sendCommand(params) {
-            if (!targetDevice) { logError('No device'); return; }
-            debugLog('Preparing command: ' + JSON.stringify(params));
-            if (targetDevice.inCommunication && !targetDevice.inCommunication()) {
-                logWarning('Comm inactive, reconnecting...');
-                targetDevice.startCommunication( function() {
-                    logSuccess('Re-established');
-                    setTimeout(() => actualSendCommand(params), 500);
-                }, function(error) {
-                    logError('Reconnect failed: ' + JSON.stringify(error));
-                    showError('Connection lost.');
-                } );
-                return;
-            }
-            actualSendCommand(params);
-        }
+			if (!targetDevice) { logError('No device'); return; }
+			
+			pendingParams = { ...pendingParams, ...params };
+			updateUIOptimistic(pendingParams);
+
+			if (commandTimeout) clearTimeout(commandTimeout);
+			
+			commandTimeout = setTimeout(() => {
+				const finalParams = { ...pendingParams };
+				pendingParams = {};
+				
+				if (targetDevice.inCommunication && !targetDevice.inCommunication()) {
+					logWarning('Comm inactive, reconnecting...');
+					targetDevice.startCommunication( 
+						() => setTimeout(() => actualSendCommand(finalParams), 500), 
+						(error) => logError('Reconnect failed')
+					);
+				} else {
+					actualSendCommand(finalParams);
+				}
+			}, 0);
+		}
 
         function actualSendCommand(params) {
             debugLog('▶▶▶ SENDING: ' + JSON.stringify(params) + ' ▶▶▶');
@@ -1352,13 +1423,6 @@
                 showError('Command timeout');
             }, 15000);
             try {
-                /* ---
-                 * OPTIMIZATION 4: Check for returned status
-                 * The success callback now accepts a 'status' object.
-                 * If the device returns its new state, we use it directly
-                 * and skip the 'refreshStatusSilent' call.
-                 * ---
-                 */
                 targetDevice.setStatus(params, function(status) { // <-- Check for 'status'
                     clearTimeout(commandTimeout);
                     logSuccess('✅ Command CONFIRMED! (' + (Date.now() - startTime) + 'ms)');
@@ -1384,25 +1448,26 @@
             }
         }
 
-        function refreshStatusSilent() {
-            if (!targetDevice) return;
-            targetDevice.getStatus( function(status) {
-				if (status) {
-                    debugLog('BG Status: ' + JSON.stringify(status));
-                    updateUI(status);
-                    updateSettingsUI(status);
-                } else {
-                    debugLog('BG Status was null (device busy?). Skipping UI update.');
-                }
-            }, function(error) {
-                debugLog('BG Status failed (ignored): ' + error);
-            } );
-        }
+        function startPolling() {
+			if (statusRefreshTimer) clearTimeout(statusRefreshTimer);
+			
+			statusRefreshTimer = setTimeout(() => {
+				if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
+					refreshStatusSilent(() => startPolling()); // Pass as callback
+				} else {
+					startPolling(); // Skip this tick, try again later
+				}
+			}, REFRESH_INTERVAL);
+		}
 
-        /* ---
-         * OPTIMIZATION 2: All functions below now use the 'ui' cache
-         * ---
-         */
+		// Update refreshStatusSilent to accept a callback
+		function refreshStatusSilent(onComplete) {
+			if (!targetDevice) { if(onComplete) onComplete(); return; }
+			targetDevice.getStatus(
+				(status) => { /* update UI */ if(onComplete) onComplete(); },
+				(error) => { /* handle error */ if(onComplete) onComplete(); }
+			);
+		}
         
         function updateUIOptimistic(params) {
             debugLog('Optimistic UI update...');
@@ -1418,10 +1483,11 @@
             if (params.hasOwnProperty('auto') || params.hasOwnProperty('wind')) {
                 ui.speedButtons.forEach(btn => btn.classList.remove('active'));
                 if (params.auto) {
-                    document.querySelector('[data-speed="auto"]').classList.add('active'); // querySelector is still needed here
+                    const autoBtn = ui.speedButtonsContainer.querySelector('[data-speed="auto"]');
+                    if (autoBtn) autoBtn.classList.add('active');
                     updateSpeedDisplay('auto', 0);
                 } else if (params.wind) {
-                    const btn = document.querySelector(`[data-speed="${params.wind}"]`);
+                    const btn = ui.speedButtonsContainer.querySelector(`[data-speed="${params.wind}"]`);
                     if (btn) btn.classList.add('active');
                     updateSpeedDisplay('manual', params.wind);
                 }
@@ -1466,22 +1532,26 @@
 
         function updateAirQuality(value) {
             ui.particulateValue.textContent = value;
-            ui.airQualityBanner.className = 'air-quality-banner';
-            let imageSrc = '../img/control-head-led-gr.png';
+            ui.airQualityBanner.classList.remove('good', 'moderate', 'unhealthy');
+            
+            let imageSrc, bannerClass, bannerText;
             
             if (value <= 100) {
-                ui.airQualityBanner.classList.add('good');
-                ui.airQualityBanner.textContent = 'GOOD';
+                bannerClass = 'good';
+                bannerText = 'GOOD';
                 imageSrc = '../img/control-head-led-gr.png';
             } else if (value <= 200) {
-                ui.airQualityBanner.classList.add('moderate');
-                ui.airQualityBanner.textContent = 'MODERATE';
+                bannerClass = 'moderate';
+                bannerText = 'MODERATE';
                 imageSrc = '../img/control-head-led-or.png';
             } else {
-                ui.airQualityBanner.classList.add('unhealthy');
-                ui.airQualityBanner.textContent = 'UNHEALTHY';
+                bannerClass = 'unhealthy';
+                bannerText = 'UNHEALTHY';
                 imageSrc = '../img/control-head-led-re.png';
             }
+            
+            ui.airQualityBanner.classList.add(bannerClass);
+            ui.airQualityBanner.textContent = bannerText;
             ui.deviceImage.src = imageSrc;
         }
 
@@ -1566,6 +1636,9 @@
             
             ui.filterAlert.classList.toggle('show', filterUsed >= filterReplaceHours);
             ui.bulbAlert.classList.toggle('show', bulbUsed >= bulbReplaceHours);
+			
+			if (ui.filterLifeDisplay) ui.filterLifeDisplay.textContent = `${filterLifePercent.toFixed(0)}%`;
+            if (ui.uvLifeDisplay) ui.uvLifeDisplay.textContent = `${bulbLifePercent.toFixed(0)}%`;
             
             debugLog(`Filter: ${filterUsed}/${filterReplaceHours} (${filterLifePercent.toFixed(1)}%), Bulb: ${bulbUsed}/${bulbReplaceHours} (${bulbLifePercent.toFixed(1)}%)`);
             debugLog('Settings UI update complete');
@@ -1651,7 +1724,7 @@
         }
 
         window.addEventListener('beforeunload', function() {
-            if (statusRefreshInterval) clearInterval(statusRefreshInterval);
+            if (statusRefreshTimer) clearTimeout(statusRefreshTimer);
             if (targetDevice) {
                 try {
                     targetDevice.stopCommunication();
