@@ -225,6 +225,8 @@ ASPEException.prototype = Object.create(Error.prototype);
 
 (function() {
   'use strict';
+  
+  ASPE.RESET_PAYLOAD = new Array(255).fill(0);
 
   // 通信毎にSequence Numberは0から始める必要があるらしい
   // 即ち接続するデバイス毎にこれを管理する必要があるのだが、複数同時接続とか必要になったら考える
@@ -288,7 +290,7 @@ ASPEException.prototype = Object.create(Error.prototype);
    */
   ASPE.buildResetMessage = function() {
     var message = new ASPEMessage();
-    message.data = new Array(255).fill(0);
+    message.data = ASPE.RESET_PAYLOAD.slice();
     return message;
   }
 

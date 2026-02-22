@@ -835,99 +835,72 @@
 
   Guardian.prototype._attachDeviceInfo = function(device, checkServer) {
     var self = this;
-    var $dfd = $.Deferred();
 
     // デバイスIDの取得
     var args = {};
     if (device.jm1 && device.jm1.serviceUuid) {
-      // serviceUuidがある場合はそれを優先的に使用する(オフラインでも利用可能)
       args.serviceUuid = device.jm1.serviceUuid;
       args.type = device.jm1Type;
-    } else
-    if (device.deviceHandle) {
-      // deviceHandle値がある場合はそれを使用する(オンライン必須)
+    } else if (device.deviceHandle) {
       args.deviceHandle = device.deviceHandle;
     } else {
       // 不正情報デバイス
-      $dfd.resolve();
-      return;
+      return $.Deferred().resolve().promise();
     }
+
     // デバイスIDが無ければ取得
-      var $d;
-      if (!device.deviceId) {
-        // --- PATCH START ---
-        // Try to get deviceId, but if it fails (times out),
-        // fall back to using the serviceUuid as the deviceId.
-        $d = $._getDevice(args).then(
-          function(id) { return id; }, // Success
-          function(err) { // Failure (timeout)
+    var deviceIdPromise = device.deviceId 
+      ? $.Deferred().resolve(device.deviceId).promise()
+      : $._getDevice(args).then(
+          function(id) { return id; },
+          function() {
             self.warn('$._getDevice failed. Using serviceUuid as deviceId fallback.');
-            return args.serviceUuid; // FALLBACK
+            return args.serviceUuid; 
           }
         );
-        // --- END PATCH ---
-      } else {
-        $d = $.Deferred().resolve(device.deviceId);
-      }
-      $d.then(function(deviceId) {
-        self.debug('_attachDeviceInfo deviceId=' + deviceId);
-        if (deviceId) {
-          device.deviceId = deviceId;
-          // デバイスハンドルが無ければ取得
-          if (!device.deviceHandle) {
-            // --- PATCH START ---
-            // Try to get handle, but if it fails,
-            // fall back to using the deviceId (which is now our serviceUuid) as the handle.
-            return $._getDeviceHandle({deviceId: deviceId}).then(
-              function(handle) { return handle; }, // Success
-              function(err) { // Failure (timeout)
-                self.warn('$._getDeviceHandle failed. Using deviceId as handle fallback.');
-                return deviceId; // FALLBACK
-              }
-            );
-            // --- END PATCH ---
-          }
+
+    return deviceIdPromise.then(function(deviceId) {
+      self.debug('_attachDeviceInfo deviceId=' + deviceId);
+      if (deviceId) {
+        device.deviceId = deviceId;
+        // デバイスハンドルが無ければ取得
+        if (!device.deviceHandle) {
+          return $._getDeviceHandle({deviceId: deviceId}).then(
+            function(handle) { return handle; },
+            function() {
+              self.warn('$._getDeviceHandle failed. Using deviceId as handle fallback.');
+              return deviceId; 
+            }
+          );
         }
-        return device.deviceHandle;
-      }).then(function(deviceHandle) {
+      }
+      return device.deviceHandle;
+    }).then(function(deviceHandle) {
       if (deviceHandle != -1) {
         self.debug('_attachDeviceInfo deviceHandle=' + deviceHandle);
         device.deviceHandle = deviceHandle;
       }
       if (!checkServer) {
-        // サーバー情報が不要な場合は以降をskip
-        return;
+        return $.Deferred().resolve().promise();
       }
       // プロダクト名を取得
       return self._getJm1ProductName(device.jm1.productCode);
     }).then(function(productName) {
-      if (!checkServer) {
-        // サーバー情報が不要な場合は以降をskip
-        return;
-      }
+      if (!checkServer) return;
+      
       self.debug('_attachDeviceInfo productName=' + productName);
       device.productName = productName;
-      var $queries = [];
-      // 登録済みのデバイス名があれば取得
-      $queries.push(self._getRegisteredDeviceName(device.getUniqueId())
-        .then(function(response) {
-          self.debug('_getRegisteredDeviceName:', response);
-          if (response.deviceName) {
-            device.deviceName = response.deviceName;
-          }
-          if (response.imageUrl) {
-            device.deviceImage = response.imageUrl;
-          }
-        })
-      );
-      return $.when.apply($, $queries);
-    }).done(function() {
-      $dfd.resolve();
-    }).fail(function(err, data) {
-      $dfd.reject(err, data);
+      
+      return self._getRegisteredDeviceName(device.getUniqueId()).then(function(response) {
+        self.debug('_getRegisteredDeviceName:', response);
+        if (response.deviceName) {
+          device.deviceName = response.deviceName;
+        }
+        if (response.imageUrl) {
+          device.deviceImage = response.imageUrl;
+        }
+      });
     });
-
-    return $dfd.promise();
   }
 
   /**
@@ -940,9 +913,8 @@
   Guardian.prototype._findCachedDevice = function(uniqueId) {
     if (typeof uniqueId == 'string') {
       return this.__cachedDevices[uniqueId.toUpperCase()];
-    } else
-    if (typeof uniqueId == 'number') {
-      return this.__cachedDevices[('0000000'+ uniqueId.toString(16)).slice(-8).toUpperCase()];
+    } else if (typeof uniqueId == 'number') {
+      return this.__cachedDevices[('00000000' + uniqueId.toString(16)).slice(-8).toUpperCase()];
     }
   }
 
@@ -2748,7 +2720,7 @@
    * 実行端末が変わる等して、復元されたDevice Handle値の互換性が失われた場合はDevice IDが無い状態になる
    * そのような場合は周辺検索からやり直して再取得し直す
    */
-	Guardian.Device.prototype._ensureDeviceId = function() {
+  Guardian.Device.prototype._ensureDeviceId = function() {
     var self = this;
     var guardian = this.guardian;
     return $.Deferred(function($dfd) {
@@ -2758,26 +2730,21 @@
       }
 
       let attemptCount = 0;
-      const maxAttempts = 10; // 10 attempts * 500ms = 5 seconds
-      let intervalId = null;
+      const maxAttempts = 10; 
+      let retryTimer = null;
 
       const attemptFind = function() {
         if (attemptCount++ > maxAttempts) {
           self.error('_ensureDeviceId timeout.');
-          clearInterval(intervalId);
           $dfd.reject(new Error('_ensureDeviceId timeout'));
           return;
         }
 
         self.debug('ensureDeviceId attempt ' + attemptCount);
         
-        // Call findDevice, which is async
         guardian.findDevice(self.getUniqueId(), 
-          function(device) { // SUCCESS callback
+          function(device) { 
             if (device) {
-              // We found it. Stop the loop.
-              clearInterval(intervalId);
-              
               if (device.deviceId && device.deviceHandle) {
                 self.debug('ensureDeviceId SUCCESS');
                 self.deviceId = device.deviceId;
@@ -2789,19 +2756,20 @@
                 self.error('_ensureDeviceId unexpected device state:' + JSON.stringify(device));
                 $dfd.reject(new Error('Device found but handle is missing'));
               }
+            } else {
+              // Device not found yet, wait 500ms then try again
+              retryTimer = setTimeout(attemptFind, 500);
             }
-            // If device is null, the loop will just continue
           },
-          function(err) { // FAILURE callback
+          function(err) { 
             self.error('ensureDeviceId findDevice error: ' + (err ? err.message : 'unknown'));
-            // Loop will continue
+            // Wait 500ms then try again even on error to bypass intermittent bridge failures
+            retryTimer = setTimeout(attemptFind, 500);
           }
         );
       };
 
-      intervalId = setInterval(attemptFind, 500); // Poll every 500ms
       attemptFind(); // Run the first attempt immediately
-
     });
   }
 
@@ -3222,8 +3190,10 @@
   Guardian.Device.prototype._createDataBlockBuffer = (function() {
 
     function polling(obj) {
-      return $.hubea.util.repeat(500, function(handle, times) {
-        if (30 < times) {
+      // Reduced from 500ms to 50ms polling to cut command latency
+      return $.hubea.util.repeat(50, function(handle, times) {
+        // Increased threshold to 300 (300 * 50ms = 15000ms timeout limit)
+        if (300 < times) {
           handle.fail(Guardian.ErrorTypes.READ_TIMEOUT);
           return;
         }
@@ -3236,7 +3206,6 @@
         .then(function(data) {
           var $queries = [];
           if (Array.isArray(data)) {
-            // 1 messageを分割して受信するかは不明だが連結する
             data.forEach(function(txt, i) {
               $queries.push(obj.parse(txt));
             });
@@ -3279,14 +3248,11 @@
         resolver: function() {
           try {
             var message = guardian.fetchMessage(this.buffer);
-            // skip buffer position
             this.buffer.splice(0, message.getLength());
             return message;
           } catch (e) {
-            if (e instanceof ASPEException) {
-              if (e.type == ASPEException.Types.TOO_SHORT_PACKET) {
-                return; // continue
-              }
+            if (e instanceof ASPEException && e.type == ASPEException.Types.TOO_SHORT_PACKET) {
+              return; 
             }
             return e;
           }
@@ -3298,56 +3264,53 @@
   // [IN] data:Array<number> [OUT] string
   Guardian.Device.prototype._encrypt = function(data) {
     var self = this;
-    return $.Deferred(function($dfd) {
-      if (!self.localKey) {
-        $dfd.resolve(hubea.util.toBase64(data));
-        return;
-      }
-      $._generateCommand({
+    
+    if (!self.localKey) {
+      return $.Deferred().resolve(hubea.util.toBase64(data)).promise();
+    }
+    
+    return $._generateCommand({
+      deviceId: self.deviceId,
+      payload: hubea.util.toBase64(data)
+    })
+    .then(function(result) {
+      return $._encodeData({
         deviceId: self.deviceId,
-        payload: hubea.util.toBase64(data)
-      })
-      .then(function(result) {
-        return $._encodeData({
-          deviceId: self.deviceId,
-          data: result.rawCommand,
-          key: self.localKey
-        });
-      })
-      .done(function(data) {
-        $dfd.resolve(data);
-      })
-      .fail(function() {
-        $dfd.reject(Guardian.ErrorTypes.HUBEA_JS_ERROR);
+        data: result.rawCommand,
+        key: self.localKey
       });
+    })
+    .fail(function() {
+      // Return a rejected promise matching the original error type
+      return $.Deferred().reject(Guardian.ErrorTypes.HUBEA_JS_ERROR).promise();
     });
   }
 
   // [IN] data:string [OUT] Array<number>
   Guardian.Device.prototype._decrypt = function(data) {
     var self = this;
-    return $.Deferred(function($dfd) {
-      if (!self.localKey) {
-        $dfd.resolve(hubea.util.base64ToArray(data));
-        return;
-      }
-      $._decodeData({
+    
+    if (!self.localKey) {
+      return $.Deferred().resolve(hubea.util.base64ToArray(data)).promise();
+    }
+    
+    return $._decodeData({
+      deviceId: self.deviceId,
+      data: data,
+      key: self.localKey
+    })
+    .then(function(decodedData) {
+      return $._parseRawCommand({
         deviceId: self.deviceId,
-        data: data,
-        key: self.localKey
-      })
-      .then(function(data) {
-        return $._parseRawCommand({
-          deviceId: self.deviceId,
-          rawCommand: data
-        });
-      })
-      .done(function(result) {
-        $dfd.resolve(hubea.util.base64ToArray(result.payload));
-      })
-      .fail(function() {
-        $dfd.reject(Guardian.ErrorTypes.HUBEA_JS_ERROR);
+        rawCommand: decodedData
       });
+    })
+    .then(function(result) {
+      // Map the final result directly into the promise chain
+      return hubea.util.base64ToArray(result.payload);
+    })
+    .fail(function() {
+      return $.Deferred().reject(Guardian.ErrorTypes.HUBEA_JS_ERROR).promise();
     });
   }
 
@@ -3710,17 +3673,22 @@
     ];
   }
 
+// Pre-allocate the available parameters statically to avoid O(N) mapping on every UI tick
+  Purifier.AVAILABLE_PARAMS = Object.keys(Purifier.Settings).map(function(key) {
+    return Purifier.Settings[key];
+  });
+
   Purifier.prototype._filterDeviceSettingParams = function(args) {
-    //var availableParams = ['power', 'wind', 'auto', 'timer', 'uv'];
-    var availableParams = Object.keys(Purifier.Settings).map(function(key) {
-      return Purifier.Settings[key];
-    });
-    var ret = $.extend({}, args);
-    Object.keys(ret).forEach(function(key, i) {
-      if (availableParams.indexOf(key) < 0) {
-        delete ret[key];
+    var ret = {};
+    
+    // O(1) mapping by only iterating over explicitly allowed keys
+    for (var i = 0; i < Purifier.AVAILABLE_PARAMS.length; i++) {
+      var key = Purifier.AVAILABLE_PARAMS[i];
+      if (args.hasOwnProperty(key)) {
+        ret[key] = args[key];
       }
-    });
+    }
+    
     return ret;
   }
 
@@ -3824,7 +3792,7 @@
       }
     }
 	if (Object.keys(result).length === 0) {
-              self.warn('_parseDeviceSettingReport: No valid data found in response.');
+              this.warn('_parseDeviceSettingReport: No valid data found in response.');
               return null;
           }
     return result;
