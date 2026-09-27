@@ -970,16 +970,12 @@
       // mergeするデータがあるのでローカルデータを先読みする
       $._storageRead(SKEY_LOCALKEY)
         .then(function(localKey) {
-          // このdecodeは(インストール直後等、データが無い場合があるので)失敗しても良い
-          decoder(localKey);
-          // サーバー上のデータから復元する
-          return self._recoverDevicesData(decoder)
-            .then(null, function() {
-              // failed fallback
-              self.debug('_loadDeviceData: failed to recover server data');
-              // サーバー上のデータが確認できない状態では既に保存されているキャッシュがある場合のみ継続可能
-              return decoder(localKey);
-            });
+          // --- PATCHED (offline build) ---
+          // The Guardian cloud server is gone. The old code called _recoverDevicesData() here,
+          // which waited up to 10s for the dead server on EVERY launch before using the local key
+          // (and, if the domain ever answered, could overwrite the saved local keys).
+          // The locally saved key is all we need, so use it directly.
+          return decoder(localKey);
         })
         .done(function() {
           self.debug('_loadDeviceData <<<');

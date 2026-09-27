@@ -4,7 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GermGuardian Control</title>
+    <script>
+        /* Anti-flash: paint the saved theme onto <html> before the first frame.
+           Runs synchronously in <head>, so the saved theme is on screen from the very first frame. */
+        (function () {
+            try {
+                var amoled = localStorage.getItem('amoledMode') === 'true';
+                var dark = localStorage.getItem('darkMode') === 'true'; /* nothing saved = light, like the original app */
+                var bg = amoled ? '#000000' : (dark ? '#1a1a1a' : '#f5f5f5');
+                var de = document.documentElement;
+                de.style.background = bg;
+                de.setAttribute('data-early-theme', amoled ? 'amoled' : (dark ? 'dark' : 'light'));
+            } catch (e) {
+                document.documentElement.style.background = '#f5f5f5';
+            }
+        })();
+    </script>
+    <!-- App libraries. "defer" = download in parallel, then run in order right after the page is parsed
+         (before DOMContentLoaded). The old code waited for window 'load' (every image), then guessed
+         paths and loaded these four files one at a time. -->
+    <script defer src="../js/jquery-2.1.4.min.js"></script>
+    <script defer src="../js/hubea-r8533.js"></script>
+    <script defer src="../js/aspe.js"></script>
+    <script defer src="../js/guardian.js"></script>
     <style>
+        /* Fallback background before <body> classes are applied, keyed off the early-theme attribute */
+        html { background: #f5f5f5; }
+        html[data-early-theme="amoled"] { background: #000000; }
+        html[data-early-theme="light"]  { background: #f5f5f5; }
+        html[data-early-theme="dark"]   { background: #1a1a1a; }
+
         :root {
             --color-bg: #f5f5f5;
             --color-bg-secondary: white;
@@ -45,6 +74,35 @@
             --color-toggle-knob: #ffffff;
             --color-shadow: rgba(255, 255, 255, 0.1);
             --color-border-amoled-toggle: #333; /* Specific for amoled toggle */
+        }
+
+        /* Early-theme variables: applied from the <head> anti-flash script's attribute,
+           so the connection screen shows the correct colors on the very first frame,
+           before JS finishes and adds the body class. */
+        html[data-early-theme="dark"] body {
+            --color-bg: #1a1a1a;
+            --color-bg-secondary: #2d2d2d;
+            --color-border: #404040;
+            --color-border-light: #404040;
+            --color-text-primary: #e0e0e0;
+            --color-text-secondary: #b0b0b0;
+            --color-text-dim: #808080;
+            --color-toggle-bg: #404040;
+            --color-toggle-knob: #e0e0e0;
+            --color-shadow: rgba(0, 0, 0, 0.3);
+        }
+        html[data-early-theme="amoled"] body {
+            --color-bg: #000000;
+            --color-bg-secondary: #000000;
+            --color-border: #1a1a1a;
+            --color-border-light: #1a1a1a;
+            --color-text-primary: #e0e0e0;
+            --color-text-secondary: #b0b0b0;
+            --color-text-dim: #808080;
+            --color-toggle-bg: #1a1a1a;
+            --color-toggle-knob: #ffffff;
+            --color-shadow: rgba(255, 255, 255, 0.1);
+            --color-border-amoled-toggle: #333;
         }
         
         /* --- Base Styles (Written Once) --- */
@@ -656,12 +714,28 @@
         ];
         let guardian = null;
         let targetDevice = null;
-		let setupFinished = false;
         let allDiscoveredDevices = [];
         let REFRESH_INTERVAL = 10000;
-		let commandTimeout = null;
-		let pendingParams = {};
-		let statusRefreshTimer = null;
+        let commandTimeout = null;
+        let pendingParams = {};
+        let statusRefreshTimer = null;
+
+        // Connection / resume state
+        let setupReady = false;              // true once a device is connected and polling is running
+        let connectionSeq = 0;               // bumped on every (re)connect so stale callbacks are ignored
+        let commandsInFlight = 0;            // commands sent but not answered yet
+        let controlListenersAttached = false;
+        let hiddenAt = 0;                    // when the app went to the background (0 = unknown)
+        let lastResumeAt = 0;
+        let resumeInFlight = false;
+        const LINK_STALE_MS = 25000;         // away longer than this -> start a fresh Bluetooth link
+        const BUSY_ERROR = 4;                // Guardian.ErrorTypes.CONNECTION_BUSY (fallback value)
+
+        // Bluetooth operations this page started that haven't answered yet (id -> start time).
+        // Used to run one operation at a time instead of colliding ("device busy").
+        const liveOps = new Map();
+        let opSeq = 0;
+        const OP_MAX_AGE_MS = 20000;         // longest one operation can take (15 s in-range wait + margin)
 
         let ui = {};
 
@@ -675,28 +749,75 @@
         };
         
         // --- Logging ---
-	function debugLog(message, type = 'info') {
-	    originalConsole.log(message);
+        // Keeps the newest LOG_MAX lines in memory (used by "Copy Log") and writes them to the on-screen
+        // consoles in small batches. Nothing is drawn while the log is hidden.
+        // (The old version added every line to two consoles immediately and never removed any, which
+        // forced a re-layout per line and made the app slower the longer it stayed open.)
+        const LOG_MAX = 500;                 // lines kept for Copy Log
+        const LOG_DOM_MAX = 200;             // lines shown on screen
+        const logBuffer = [];
+        let logPending = [];
+        let logFlushTimer = null;
+        let logVisible = (function() {
+            try { return localStorage.getItem('logVisible') !== 'false'; } catch (e) { return true; }
+        })();
 
-	    // Get both debug divs from cache, with a fallback for early logs
- 	   const debugDiv1 = ui.debugInfo || document.getElementById('debugInfo');
- 	   const debugDiv2 = ui.debugInfoSettings || document.getElementById('debugInfoSettings');
-    
- 	   const p = document.createElement('p');
-  	  p.className = type;
-  	  const timestamp = new Date().toLocaleTimeString();
-  	  p.textContent = timestamp + ': ' + message;
+        function logTargets() {
+            return [ui.debugInfo || document.getElementById('debugInfo'),
+                    ui.debugInfoSettings || document.getElementById('debugInfoSettings')].filter(Boolean);
+        }
 
-   	 // Always append to both logs. Visibility is controlled by CSS.
-  	  if (debugDiv1) { 
-   	     debugDiv1.appendChild(p.cloneNode(true)); // Use cloneNode for the second div
-   	     debugDiv1.scrollTop = debugDiv1.scrollHeight; 
-  	  }
-  	  if (debugDiv2) { 
-   	     debugDiv2.appendChild(p); 
-    	    debugDiv2.scrollTop = debugDiv2.scrollHeight; 
-  	  }
-	}
+        function debugLog(message, type = 'info') {
+            originalConsole.log(message);
+            const entry = { text: new Date().toLocaleTimeString() + ': ' + message, type: type };
+            logBuffer.push(entry);
+            if (logBuffer.length > LOG_MAX) logBuffer.splice(0, logBuffer.length - LOG_MAX);
+            if (!logVisible) return;
+            logPending.push(entry);
+            if (!logFlushTimer) logFlushTimer = setTimeout(flushLog, 60);
+        }
+
+        function flushLog() {
+            logFlushTimer = null;
+            if (!logPending.length) return;
+            const batch = logPending.length > LOG_DOM_MAX ? logPending.slice(-LOG_DOM_MAX) : logPending;
+            logPending = [];
+            logTargets().forEach(div => {
+                const frag = document.createDocumentFragment();
+                batch.forEach(e => {
+                    const p = document.createElement('p');
+                    p.className = e.type;
+                    p.textContent = e.text;
+                    frag.appendChild(p);
+                });
+                div.appendChild(frag);
+                let extra = div.childElementCount - LOG_DOM_MAX;
+                while (extra-- > 0) div.removeChild(div.firstElementChild);
+                div.scrollTop = div.scrollHeight;
+            });
+        }
+
+        function renderFullLog() {
+            if (logFlushTimer) { clearTimeout(logFlushTimer); logFlushTimer = null; }
+            logTargets().forEach(div => { div.textContent = ''; });
+            logPending = logBuffer.slice(-LOG_DOM_MAX);
+            flushLog();
+        }
+
+        function setLogVisibility(show) {
+            logVisible = !!show;
+            [ui.debugInfo, ui.copyLogBtn, ui.debugInfoSettings, ui.copyLogBtnSettings].forEach(el => {
+                if (el) el.classList.toggle('console-hidden', !logVisible);
+            });
+            if (logVisible) {
+                renderFullLog();
+            } else {
+                // Free the on-screen lines; everything is still kept in logBuffer for Copy Log.
+                logPending = [];
+                if (logFlushTimer) { clearTimeout(logFlushTimer); logFlushTimer = null; }
+                logTargets().forEach(div => { div.textContent = ''; });
+            }
+        }
         function logError(message) { debugLog('❌ ' + message, 'error'); }
         function logSuccess(message) { debugLog('✅ ' + message, 'success'); }
         function logWarning(message) { debugLog('⚠️ ' + message, 'warning'); }
@@ -720,47 +841,46 @@
         console.trace = function() { originalConsole.trace.apply(console, arguments); debugLog(formatLogArguments(Array.from(arguments)), 'info'); };
 
         // --- Script Loading ---
-        const possiblePaths = ['../js/','','../../js/','../../../js/','/js/','/air/contents/product/js/','/air/contents/dev/js/'];
+        // The four libraries now load through <script defer> tags in <head>. This is only a safety net
+        // in case one of them failed to load; normally it finds everything already there.
         const requiredScripts = [
-            { name: 'jquery', file: 'jquery-2.1.4.min.js', test: () => typeof jQuery !== 'undefined' },
-            { name: 'hubea', file: 'hubea-r8533.js', test: () => typeof hubea !== 'undefined' },
-            { name: 'aspe', file: 'aspe.js', test: () => typeof ASPE !== 'undefined' },
-            { name: 'guardian', file: 'guardian.js', test: () => typeof Guardian !== 'undefined' }
+            { file: 'jquery-2.1.4.min.js', test: () => typeof jQuery !== 'undefined' },
+            { file: 'hubea-r8533.js',      test: () => typeof hubea !== 'undefined' },
+            { file: 'aspe.js',             test: () => typeof ASPE !== 'undefined' },
+            { file: 'guardian.js',         test: () => typeof Guardian !== 'undefined' }
         ];
-        function loadScript(src) { return new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.onload = () => resolve(); script.onerror = () => { debugLog('✗ Failed: ' + src); reject(); }; document.head.appendChild(script); }); }
-        async function tryLoadScript(scriptInfo) { if (scriptInfo.test()) return true; for (const path of possiblePaths) { try { await loadScript(path + scriptInfo.file); if (scriptInfo.test()) return true; } catch (e) { } } return false; }
-		async function findValidBasePath() {
-			for (const path of possiblePaths) {
-				try {
-					await loadScript(path + 'jquery-2.1.4.min.js');
-					if (typeof jQuery !== 'undefined') return path;
-				} catch (e) { /* ignore 404s */ }
-			}
-			throw new Error('Could not resolve script path');
-		}
+        const fallbackPaths = ['../js/', '', '../../js/', '../../../js/', '/js/', '/air/contents/product/js/', '/air/contents/dev/js/'];
 
-		async function loadAllScripts() {
-			debugLog('Resolving script path...');
-			const basePath = await findValidBasePath();
-			debugLog(`Base path found: ${basePath}`);
-			
-			// Load remaining scripts sequentially from the known good path
-			const remainingScripts = [
-				{ name: 'hubea', file: 'hubea-r8533.js', test: () => typeof hubea !== 'undefined' },
-				{ name: 'aspe', file: 'aspe.js', test: () => typeof ASPE !== 'undefined' },
-				{ name: 'guardian', file: 'guardian.js', test: () => typeof Guardian !== 'undefined' }
-			];
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => resolve();
+                script.onerror = () => { script.remove(); reject(new Error('Failed: ' + src)); };
+                document.head.appendChild(script);
+            });
+        }
 
-			for (const scriptInfo of remainingScripts) {
-				if (!scriptInfo.test()) {
-					await loadScript(basePath + scriptInfo.file);
-				}
-			}
-			logSuccess('All scripts loaded');
-		}
+        async function ensureScriptsLoaded() {
+            const missing = requiredScripts.filter(s => !s.test());
+            if (missing.length === 0) { logSuccess('All scripts loaded'); return; }
+            logWarning('Not loaded: ' + missing.map(s => s.file).join(', ') + ' - trying fallback paths...');
+            for (const s of missing) {
+                if (s.test()) continue;
+                let loaded = false;
+                for (const path of fallbackPaths) {
+                    try { await loadScript(path + s.file); } catch (e) { continue; }
+                    if (s.test()) { loaded = true; debugLog('Loaded ' + s.file + ' from "' + path + '"'); break; }
+                }
+                if (!loaded) throw new Error('Could not load ' + s.file);
+            }
+            logSuccess('All scripts loaded (fallback)');
+        }
 
         // --- Initialization ---
-        window.addEventListener('load', async function() {
+        // Starts at DOMContentLoaded (HTML parsed + deferred libraries run) instead of window 'load',
+        // which also waited for every image to finish loading.
+        async function startApp() {
             ui = {
                 // Connection Screen
                 connectionScreen: document.getElementById('connectionScreen'),
@@ -822,63 +942,72 @@
             debugLog('App starting... UI cache populated.');
             applySavedSettings();
             setupEventListeners();
+            setupControlListeners();   // attach once, right away (used to wait for the first status read)
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) onAppBackground(); else onAppForeground('visibilitychange');
+            });
+            window.addEventListener('pageshow', function(e) { if (e.persisted) onAppForeground('pageshow'); });
             try {
-                await loadAllScripts();
+                await ensureScriptsLoaded();
                 await initializeApp();
             } catch (error) {
                 logError('Startup failed: ' + error.message);
                 showError('Startup failed: ' + error.message);
                 ui.retryBtn.classList.remove('hidden');
             }
-        });
+        }
 
-		async function initializeApp() {
-			try {
-				debugLog('Initializing Guardian...');
-				debugLog('jQuery loaded: ' + (typeof jQuery !== 'undefined'));
-				debugLog('hubea loaded: ' + (typeof hubea !== 'undefined'));
-				debugLog('ASPE loaded: ' + (typeof ASPE !== 'undefined'));
-				debugLog('Guardian loaded: ' + (typeof Guardian !== 'undefined'));
-				if (typeof hubea !== 'undefined' && hubea.event) {
-                    hubea.event.bind('onResume', resumeAppConnections);
-                    logSuccess('✅ onResume listener attached.');
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startApp);
+        } else {
+            startApp();
+        }
+
+        async function initializeApp() {
+            try {
+                debugLog('Initializing Guardian...');
+                debugLog('jQuery loaded: ' + (typeof jQuery !== 'undefined'));
+                debugLog('hubea loaded: ' + (typeof hubea !== 'undefined'));
+                debugLog('ASPE loaded: ' + (typeof ASPE !== 'undefined'));
+                debugLog('Guardian loaded: ' + (typeof Guardian !== 'undefined'));
+                if (typeof hubea !== 'undefined' && hubea.event) {
+                    hubea.event.bind('onResume', function() { onAppForeground('onResume'); });
+                    logSuccess('onResume listener attached.');
                 } else {
-                    logWarning('hubea.event.bind not available. App resume may not work.');
+                    logWarning('hubea.event.bind not available. Using page visibility for resume only.');
                 }
-				const serverTypes = ['l', 'p', 'd', 's'];
-				let initialized = false;
-				
-				for (const serverType of serverTypes) {
-					try {
-						debugLog('Trying server type: ' + serverType);
-						guardian = new Guardian({ debug: 5, serverType: serverType });
-						await new Promise((resolve, reject) => {
-							const timeout = setTimeout(() => { reject(new Error('Setup timeout after 15 seconds')); }, 15000);
-							guardian.setup(
-								() => { clearTimeout(timeout); resolve(); }, 
-								(err) => { clearTimeout(timeout); reject(new Error('Setup failed: ' + JSON.stringify(err))); }
-							);
-						});
-						logSuccess('Guardian initialized with server type: ' + serverType);
-						initialized = true;
-						break;
-					} catch (err) { 
-						logWarning('Failed with ' + serverType + ': ' + err.message); 
-					}
-				}
-				
-				if (!initialized) throw new Error('Could not initialize with any server type');
-				
-				findDevice();
-			} catch (error) {
-				logError('Init error: ' + error.message);
-				logWarning('Attempting direct BLE connection...');
-				tryDirectConnection();
-			}
-		}
+                // Only the offline ('l') server type. The Guardian cloud is gone, so the old loop over
+                // 'l','p','d','s' (15 s each) could waste a full minute before trying direct Bluetooth.
+                const serverType = 'l';
+                debugLog('Trying server type: ' + serverType);
+                guardian = new Guardian({ debug: 5, serverType: serverType });
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => { reject(new Error('Setup timeout after 10 seconds')); }, 10000);
+                    guardian.setup(
+                        () => { clearTimeout(timeout); resolve(); },
+                        (err) => { clearTimeout(timeout); reject(new Error('Setup failed: ' + JSON.stringify(err))); }
+                    );
+                });
+                logSuccess('Guardian initialized with server type: ' + serverType);
+                findDevice();
+            } catch (error) {
+                logError('Init error: ' + error.message);
+                logWarning('Attempting direct BLE connection...');
+                tryDirectConnection();
+            }
+        }
 
         async function tryDirectConnection() {
-            try { debugLog('Using direct BLE approach...'); guardian = new Guardian({ debug: 3, serverType: 'l' }); setTimeout(() => { debugLog('Starting direct device search...'); findDeviceDirectly(); }, 1000); } catch (error) { logError('Direct connection failed: ' + error.message); showError('Unable to connect. Please check Bluetooth is enabled.'); ui.retryBtn.classList.remove('hidden'); }
+            try {
+                debugLog('Using direct BLE approach...');
+                guardian = new Guardian({ debug: 3, serverType: 'l' });
+                debugLog('Starting direct device search...');
+                findDeviceDirectly();   // (the old code waited an extra second here for no reason)
+            } catch (error) {
+                logError('Direct connection failed: ' + error.message);
+                showError('Unable to connect. Please check Bluetooth is enabled.');
+                ui.retryBtn.classList.remove('hidden');
+            }
         }
 
         function getDeviceIdentifier(device) {
@@ -889,90 +1018,93 @@
             return 'unknown-device-' + Math.random();
         }
 
+        // Search retry timing: check again quickly at first (the purifier is usually seen within a
+        // second or two of launch), then back off. The total search window is about the same as before.
+        function retryDelay(attempt) {
+            if (attempt <= 3) return 500;
+            if (attempt <= 6) return 1000;
+            return 2000;
+        }
+        const SEARCH_WATCHDOG_MS = 6000;   // if a native scan call never answers, retry anyway
+
         function findDeviceDirectly() {
             updateConnectionStatus('Searching (Direct BLE)...');
             debugLog('Direct device search started...');
-            let attemptCount = 0; const maxAttempts = 15;
+            let attemptCount = 0; const maxAttempts = 19;
+            let finished = false;
+            const scheduleRetry = (failMessage) => {
+                if (finished) return;
+                if (attemptCount < maxAttempts) {
+                    setTimeout(searchAttempt, retryDelay(attemptCount));
+                } else {
+                    finished = true;
+                    showError(failMessage);
+                    ui.retryBtn.classList.remove('hidden');
+                }
+            };
             const searchAttempt = () => {
+                if (finished) return;
                 attemptCount++;
-                debugLog('Direct search attempt ' + attemptCount + '/' + maxAttempts);
+                const thisAttempt = attemptCount;
+                let answered = false;
+                const watchdog = setTimeout(() => {
+                    if (answered || finished) return;
+                    answered = true;
+                    logWarning('Direct search attempt ' + thisAttempt + ' got no answer; retrying...');
+                    scheduleRetry('Bluetooth search is not responding. Please check permissions and device.');
+                }, SEARCH_WATCHDOG_MS);
+                // Returns false for a late answer that the watchdog already gave up on.
+                const claim = () => {
+                    if (answered || finished) return false;
+                    answered = true;
+                    clearTimeout(watchdog);
+                    return true;
+                };
+                debugLog('Direct search attempt ' + thisAttempt + '/' + maxAttempts);
                 try {
                     if (typeof hubea !== 'undefined' && hubea.jm1) {
                         hubea.jm1.getNearbyJm1s({ types: [93240, 82567] }, function(jm1s) {
+                            if (!claim()) return;
+                            jm1s = jm1s || [];
                             debugLog('Found ' + jm1s.length + ' raw JM1 device(s)');
-                            
-                            if (jm1s && jm1s.length > 0) {
-                                jm1s.forEach(function(jm1, index) {
-                                    console.log('=== Device ' + (index + 1) + ' Details ===');
-                                    console.log('serviceUuid:', jm1.serviceUuid);
-                                    console.log('productCode:', jm1.productCode);
-                                    // ... (rest of the logging)
-                                });
-                                
-                                const validGuardianDevicesJm1s = jm1s;
-                                debugLog('Found ' + validGuardianDevicesJm1s.length + ' valid Guardian device(s) via direct scan.');
-                                
-                                if (validGuardianDevicesJm1s.length === 0 && jm1s.length > 0) {
-                                    logWarning('No devices matched GUARDIAN_PRODUCT_CODES. Creating devices anyway...');
-                                    if (!guardian) guardian = new Guardian({ debug: 3, serverType: 'l' });
-									allDiscoveredDevices = jm1s.map(jm1 => guardian._createDevice(jm1)).filter(d => d);
-									if (allDiscoveredDevices.length > 0) {
-										logSuccess(`Created ${allDiscoveredDevices.length} device(s) without productCode filter.`);
-                                        const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
-                                        if (purifier) {
-                                            logSuccess('Found Purifier device (Directly). Selecting it.');
-                                            targetDevice = purifier;
-                                        } else {
-                                            logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
-                                            allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                            targetDevice = allDiscoveredDevices[0];
-                                        }
-                                        populateDeviceSelector();
-                                        logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
-                                        connectToDevice();
-                                        return;
-                                    }
-                                }
-                                if (validGuardianDevicesJm1s.length > 0) {
-                                    if (!guardian) guardian = new Guardian({ debug: 3, serverType: 'l' });
-                                    allDiscoveredDevices = validGuardianDevicesJm1s.map(jm1 => new Purifier(guardian, jm1));
-                                    logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
-                                    const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
-                                    if (purifier) {
-                                        logSuccess('Found Purifier device (Directly). Selecting it.');
-                                        targetDevice = purifier;
-                                    } else {
-                                        logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
-                                        allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                        targetDevice = allDiscoveredDevices[0];
-                                    }
-                                    populateDeviceSelector();
-                                    logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
-                                    connectToDevice();
-                                } else if (attemptCount < maxAttempts) {
-                                    setTimeout(searchAttempt, 2000);
-                                } else {
-                                    showError('No valid GermGuardian devices found. Make sure it\'s powered on and nearby.');
-                                    ui.retryBtn.classList.remove('hidden');
-                                }
-                            } else if (attemptCount < maxAttempts) {
-                                setTimeout(searchAttempt, 2000);
-                            } else {
-                                showError('No Bluetooth devices detected. Check Bluetooth permissions and ensure device is discoverable.');
-                                ui.retryBtn.classList.remove('hidden');
+                            if (jm1s.length === 0) {
+                                scheduleRetry('No Bluetooth devices detected. Check Bluetooth permissions and ensure device is discoverable.');
+                                return;
                             }
+                            jm1s.forEach(function(jm1, index) {
+                                console.log('=== Device ' + (index + 1) + ' Details ===');
+                                console.log('serviceUuid:', jm1.serviceUuid);
+                                console.log('productCode:', jm1.productCode);
+                            });
+                            debugLog('Found ' + jm1s.length + ' valid Guardian device(s) via direct scan.');
+                            if (!guardian) guardian = new Guardian({ debug: 3, serverType: 'l' });
+                            allDiscoveredDevices = jm1s.map(jm1 => new Purifier(guardian, jm1));
+                            logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
+                            const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
+                            if (purifier) {
+                                logSuccess('Found Purifier device (Directly). Selecting it.');
+                                targetDevice = purifier;
+                            } else {
+                                logWarning('No Purifier found (Directly). Defaulting to strongest signal.');
+                                allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                                targetDevice = allDiscoveredDevices[0];
+                            }
+                            finished = true;
+                            populateDeviceSelector();
+                            logSuccess('Selecting device with rssi: ' + (targetDevice.jm1.rssi || 'N/A'));
+                            connectToDevice();
                         }, function(error) {
+                            if (!claim()) return;
                             logError('JM1 direct search error: ' + JSON.stringify(error));
-                            if (attemptCount < maxAttempts) { setTimeout(searchAttempt, 2000); }
-                            else { showError('Bluetooth search failed repeatedly. Please check permissions and device.'); ui.retryBtn.classList.remove('hidden'); }
+                            scheduleRetry('Bluetooth search failed repeatedly. Please check permissions and device.');
                         });
                     } else {
                         throw new Error('Hubea BLE library not available');
                     }
                 } catch (error) {
+                    if (!claim()) return;
                     logError('Direct search attempt exception: ' + error.message);
-                    if (attemptCount < maxAttempts) { setTimeout(searchAttempt, 2000); }
-                    else { showError('Cannot access Bluetooth. Check app permissions.'); ui.retryBtn.classList.remove('hidden'); }
+                    scheduleRetry('Cannot access Bluetooth. Check app permissions.');
                 }
             };
             searchAttempt();
@@ -981,72 +1113,98 @@
         function findDevice() {
             updateConnectionStatus('Searching...');
             debugLog('Searching for devices using Guardian library...');
-            let attemptCount = 0; const maxAttempts = 10;
+            let attemptCount = 0; const maxAttempts = 14;
+            let finished = false;
+            const fallBackToDirect = (message) => {
+                if (finished) return;
+                finished = true;
+                logWarning(message);
+                findDeviceDirectly();
+            };
+            const scheduleRetry = (fallbackMessage) => {
+                if (finished) return;
+                if (attemptCount < maxAttempts) setTimeout(searchAttempt, retryDelay(attemptCount));
+                else fallBackToDirect(fallbackMessage);
+            };
             const searchAttempt = () => {
+                if (finished) return;
                 attemptCount++;
-                debugLog('Guardian search attempt ' + attemptCount + '/' + maxAttempts);
+                const thisAttempt = attemptCount;
+                debugLog('Guardian search attempt ' + thisAttempt + '/' + maxAttempts);
                 if (!guardian || !guardian.findDevices) {
-                    logWarning('Guardian library not ready, falling back to direct BLE scan...');
-                    findDeviceDirectly(); return;
+                    fallBackToDirect('Guardian library not ready, falling back to direct BLE scan...');
+                    return;
                 }
+                let answered = false;
+                const watchdog = setTimeout(() => {
+                    if (answered || finished) return;
+                    answered = true;
+                    logWarning('Search attempt ' + thisAttempt + ' got no answer; retrying...');
+                    scheduleRetry('Standard search is not responding, trying direct scan...');
+                }, SEARCH_WATCHDOG_MS);
+                const claim = () => {
+                    if (answered || finished) return false;
+                    answered = true;
+                    clearTimeout(watchdog);
+                    return true;
+                };
                 try {
                     guardian.findDevices( function(devices) {
+                        if (!claim()) return;
+                        devices = devices || [];
                         debugLog('Guardian found ' + devices.length + ' potential device(s)');
-                        if (devices && devices.length > 0) {
-                            // Filter out the Gateway
-                            const validGuardianDevices = devices.filter(device => {
-                                if (device.jm1Type !== 93240) return false;
-                                // guardian.js incorrectly assigns jm1Type 93240 to Gateways if productCode is missing.
-                                // The native deviceId retains the true type (82567). Reject it.
-                                if (device.deviceId && device.deviceId.includes('82567')) {
-                                    debugLog('Filtered out misidentified Gateway device.');
-                                    return false;
-                                }
-                                return true;
-                            });
-                            
-                            debugLog('Found ' + validGuardianDevices.length + ' valid Guardian device(s) via library.');
-                            if (validGuardianDevices.length > 0) {
-                                allDiscoveredDevices = validGuardianDevices;
-                                logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
-                                const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
-                                if (purifier) {
-                                    logSuccess('Found Purifier device. Selecting it.');
-                                    targetDevice = purifier;
-                                } else {
-                                    logWarning('No Purifier found. Defaulting to strongest signal.');
-                                    allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
-                                    targetDevice = allDiscoveredDevices[0];
-                                }
-                                
-                                if (targetDevice.localKey) {
-                                    logSuccess('Local key found. Connecting...');
-                                    connectToDevice();
-                                } else {
-                                    logWarning('Local key NOT found. Initiating pairing...');
-                                    updateConnectionStatus('Pairing Required...');
-                                    initiatePairing();
-                                }
-                            } else if (attemptCount < maxAttempts) {
-                                setTimeout(searchAttempt, 2000);
-                            } else {
-                                logWarning('Standard search failed to find valid device, trying direct scan...');
-                                findDeviceDirectly();
+                        if (devices.length === 0) {
+                            scheduleRetry('Standard search failed, trying direct scan...');
+                            return;
+                        }
+                        // Filter out the Gateway
+                        const validGuardianDevices = devices.filter(device => {
+                            if (device.jm1Type !== 93240) return false;
+                            // guardian.js incorrectly assigns jm1Type 93240 to Gateways if productCode is missing.
+                            // The native deviceId retains the true type (82567). Reject it.
+                            if (device.deviceId && device.deviceId.includes('82567')) {
+                                debugLog('Filtered out misidentified Gateway device.');
+                                return false;
                             }
-                        } else if (attemptCount < maxAttempts) {
-                            setTimeout(searchAttempt, 2000);
+                            return true;
+                        });
+
+                        debugLog('Found ' + validGuardianDevices.length + ' valid Guardian device(s) via library.');
+                        if (validGuardianDevices.length === 0) {
+                            scheduleRetry('Standard search failed to find valid device, trying direct scan...');
+                            return;
+                        }
+                        finished = true;
+                        allDiscoveredDevices = validGuardianDevices;
+                        logSuccess(`Discovered ${allDiscoveredDevices.length} valid devices.`);
+                        const purifier = allDiscoveredDevices.find(d => d.jm1Type === 93240);
+                        if (purifier) {
+                            logSuccess('Found Purifier device. Selecting it.');
+                            targetDevice = purifier;
                         } else {
-                            logWarning('Standard search failed, trying direct scan...');
-                            findDeviceDirectly();
+                            logWarning('No Purifier found. Defaulting to strongest signal.');
+                            allDiscoveredDevices.sort((a, b) => (b.jm1.rssi || -100) - (a.jm1.rssi || -100));
+                            targetDevice = allDiscoveredDevices[0];
+                        }
+                        populateDeviceSelector();   // (was only filled on the direct-scan path)
+
+                        if (targetDevice.localKey) {
+                            logSuccess('Local key found. Connecting...');
+                            connectToDevice();
+                        } else {
+                            logWarning('Local key NOT found. Initiating pairing...');
+                            updateConnectionStatus('Pairing Required...');
+                            initiatePairing();
                         }
                     }, function(error) {
+                        if (!claim()) return;
                         logError('Guardian findDevices error: ' + JSON.stringify(error));
-                        if (attemptCount < maxAttempts) { setTimeout(searchAttempt, 2000); }
-                        else { logWarning('Standard search failed repeatedly, trying direct scan...'); findDeviceDirectly(); }
+                        scheduleRetry('Standard search failed repeatedly, trying direct scan...');
                     } );
                 } catch (error) {
+                    if (!claim()) return;
                     logError('Guardian search exception: ' + error.message);
-                    findDeviceDirectly();
+                    fallBackToDirect('Falling back to direct BLE scan...');
                 }
             };
             searchAttempt();
@@ -1100,8 +1258,8 @@
                 }, function(error) {
                     logError('Connection failed: ' + JSON.stringify(error));
                     if (connectionAttempts < maxConnectionAttempts) {
-                        logWarning('Retrying in 2s...');
-                        setTimeout(attemptConnection, 2000);
+                        logWarning('Retrying in 1s...');
+                        setTimeout(attemptConnection, 1000);
                     } else {
                         showError('Connection failed after ' + maxConnectionAttempts + ' attempts');
                         ui.retryBtn.classList.remove('hidden');
@@ -1125,14 +1283,14 @@
                 return;
             }
             logSuccess(`Switching to device: ${newDevice.jm1.productCode}`);
-            if (targetDevice && typeof targetDevice.stopCommunication === 'function') {
-                debugLog('Stopping communication with old device...');
-                targetDevice.stopCommunication();
-            }
+            const oldDevice = targetDevice;
+            // Stop polling and invalidate the old connection first.
             if (statusRefreshTimer) {
-				clearTimeout(statusRefreshTimer);
-				statusRefreshTimer = null;
-			}
+                clearTimeout(statusRefreshTimer);
+                statusRefreshTimer = null;
+            }
+            setupReady = false;
+            connectionSeq++;
             targetDevice = newDevice;
             ui.mainContent.classList.add('hidden');
             ui.connectionScreen.classList.remove('hidden');
@@ -1140,76 +1298,71 @@
             ui.connectionText.textContent = 'Connecting to selected device...';
             ui.retryBtn.classList.add('hidden');
             showError('');
+            let proceeded = false;
             const proceedToNewDevice = () => {
-			targetDevice = newDevice;
-			if (targetDevice.localKey) {
-				logSuccess('New device has local key. Connecting...');
-				connectToDevice();
-			} else {
-				logWarning('New device needs pairing...');
-				updateConnectionStatus('Pairing Required...');
-				initiatePairing();
-			}
-		};
-
-		if (targetDevice && typeof targetDevice.stopCommunication === 'function') {
-			debugLog('Stopping communication with old device...');
-			targetDevice.stopCommunication(
-				() => proceedToNewDevice(), 
-				() => proceedToNewDevice() // Proceed even if disconnect errors out
-			);
-		} else {
-			proceedToNewDevice();
-		}
-	}
+                if (proceeded) return;
+                proceeded = true;
+                if (targetDevice !== newDevice) return;   // another device was picked in the meantime
+                if (newDevice.localKey) {
+                    logSuccess('New device has local key. Connecting...');
+                    connectToDevice();
+                } else {
+                    logWarning('New device needs pairing...');
+                    updateConnectionStatus('Pairing Required...');
+                    initiatePairing();
+                }
+            };
+            // Stop the OLD device once, then connect. (The old code stopped it, then called stop
+            // again on the NEW device because targetDevice had already been swapped.)
+            if (oldDevice && typeof oldDevice.stopCommunication === 'function') {
+                debugLog('Stopping communication with old device...');
+                setTimeout(proceedToNewDevice, 3000);   // don't hang if the old device never answers
+                try {
+                    oldDevice.stopCommunication(proceedToNewDevice, proceedToNewDevice);
+                } catch (err) {
+                    proceedToNewDevice();
+                }
+            } else {
+                proceedToNewDevice();
+            }
+        }
 
         function onDeviceConnected() {
+            const mySeq = ++connectionSeq;
             logSuccess('Device connected!');
             debugLog('Model: ' + (targetDevice.getModelName ? targetDevice.getModelName() : 'N/A') + ', ID: ' + (targetDevice.getUniqueId ? targetDevice.getUniqueId() : 'N/A'));
-            
+
             if(ui.deviceSelect) {
                 ui.deviceSelect.value = getDeviceIdentifier(targetDevice);
             }
             ui.connectionScreen.classList.add('hidden');
             ui.mainContent.classList.remove('hidden');
             logWarning('Getting initial state...');
-            
-            let statusReceived = false;
-            const statusTimeout = setTimeout(() => {
-                if (!statusReceived) {
-                    logWarning('Initial status timed out');
-                    finishSetup();
-                }
-            }, 8000);
-            
-            targetDevice.getStatus( function(status) {
-                statusReceived = true;
-                clearTimeout(statusTimeout);
-				
-				if (status) {
+
+            // refreshStatusSilent() updates the UI itself; this callback only logs and finishes setup
+            // (after 8 s at most, like before).
+            refreshStatusSilent(function(ok, error, status) {
+                if (mySeq !== connectionSeq) return;   // a newer connection took over
+                if (ok && status) {
                     logSuccess('Initial status received!');
                     debugLog('Current state: ' + JSON.stringify(status));
-                    updateUI(status);
-                    updateSettingsUI(status);
-                } else {
+                } else if (ok) {
                     logWarning('Initial status was null (device busy?). Skipping initial UI update.');
+                } else if (error === 'timeout') {
+                    logWarning('Initial status timed out');
+                } else {
+                    logWarning('Could not read initial status (error ' + error + ')');
                 }
                 finishSetup();
-            }, function(error) {
-                statusReceived = true;
-                clearTimeout(statusTimeout);
-                logWarning('Could not read initial status (error ' + error + ')');
-                finishSetup();
-            } );
+            }, 8000);
         }
 
         function finishSetup() {
-             if (setupFinished) return;
-             setupFinished = true;
-             
-			 startPolling();
-             setupControlListeners();
-             logSuccess('Ready!');
+            // Runs once per connection. (It used to run once per app launch, so polling never
+            // restarted after switching devices.)
+            setupReady = true;
+            startPolling();
+            logSuccess('Ready!');
         }
 
         function setupEventListeners() {
@@ -1227,46 +1380,26 @@
 			});
 
 			// Log toggle
-		ui.logToggle.addEventListener('change', function(e) {
-   			 const showLog = e.target.checked;
-   			 // Toggle visibility for both sets of log elements
-   			 ui.debugInfo.classList.toggle('console-hidden', !showLog);
-   			 ui.copyLogBtn.classList.toggle('console-hidden', !showLog);
-   			 ui.debugInfoSettings.classList.toggle('console-hidden', !showLog);
-   			 ui.copyLogBtnSettings.classList.toggle('console-hidden', !showLog);
-  			  localStorage.setItem('logVisible', showLog);
-		});
-
-			// Dark Mode toggle
-			ui.darkModeToggle.addEventListener('change', function(e) {
-				const isDark = e.target.checked;
-				if (isDark) {
-					document.body.classList.add('dark-mode');
-					document.body.classList.remove('amoled-mode');
-					ui.amoledModeToggle.checked = false;
-					updateIconsForTheme('dark');
-				} else {
-					document.body.classList.remove('dark-mode');
-					updateIconsForTheme('light');
-				}
-				localStorage.setItem('darkMode', isDark);
-				localStorage.setItem('amoledMode', 'false');
+			ui.logToggle.addEventListener('change', function(e) {
+				const showLog = e.target.checked;
+				setLogVisibility(showLog);
+				localStorage.setItem('logVisible', showLog);
 			});
 
-			// AMOLED Mode toggle
+			// Dark Mode toggle (saves the same values as before: darkMode=true/false, amoledMode=false)
+			ui.darkModeToggle.addEventListener('change', function(e) {
+				const isDark = e.target.checked;
+				localStorage.setItem('darkMode', isDark);
+				localStorage.setItem('amoledMode', 'false');
+				applyTheme(isDark ? 'dark' : 'light');
+			});
+
+			// AMOLED Mode toggle (saves amoledMode=true/false, darkMode=false)
 			ui.amoledModeToggle.addEventListener('change', function(e) {
 				const isAmoled = e.target.checked;
-				if (isAmoled) {
-					document.body.classList.add('amoled-mode');
-					document.body.classList.remove('dark-mode');
-					ui.darkModeToggle.checked = false;
-					updateIconsForTheme('amoled');
-				} else {
-					document.body.classList.remove('amoled-mode');
-					updateIconsForTheme('light');
-				}
 				localStorage.setItem('amoledMode', isAmoled);
 				localStorage.setItem('darkMode', 'false');
+				applyTheme(isAmoled ? 'amoled' : 'light');
 			});
 
 			// Polling Rate selector
@@ -1285,21 +1418,36 @@
 			ui.showKeyBtn.addEventListener('click', showAndCopyLocalKey);
         }
 		
-		function copyLogToClipboard() {
-            if (!ui.debugInfo) {
-                logError("Debug console not found.");
-                return;
-            }
-            let logText = ui.debugInfo.innerText || ui.debugInfo.textContent;
-
-            if (navigator.clipboard) {
+        function copyLogToClipboard() {
+            // Copies the whole kept log (last LOG_MAX lines), even if some of it isn't on screen.
+            const logText = logBuffer.map(e => e.text).join('\n');
+            const fallbackCopy = () => {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = logText;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    ta.setSelectionRange(0, logText.length);
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (ok) logSuccess('Log copied to clipboard!');
+                    else logError('Could not copy the log.');
+                } catch (e) {
+                    logError('Could not copy the log: ' + e.message);
+                }
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(logText).then(function() {
                     logSuccess('Log copied to clipboard!');
                 }, function(err) {
-                    logError('Failed to copy log: ' + err);
+                    logWarning('Clipboard API failed (' + err + '), trying another way...');
+                    fallbackCopy();
                 });
             } else {
-                logError('Clipboard API not available. Cannot copy.');
+                fallbackCopy();
             }
         }
         
@@ -1320,18 +1468,85 @@
                 logWarning('Cleared stale deviceId and deviceHandle.');
             }
         }
-		function resumeAppConnections() {
-            debugLog('App resumed. Checking connection status...');
+        // --- Background / foreground ---
+        // WKWebView doesn't fire 'pagehide' when you switch apps, so the old pause code never ran, and the
+        // old resume code quit early because it thought polling was still active. Now:
+        //  - going to the background pauses polling (the Bluetooth link is kept for a quick return);
+        //  - coming back refreshes right away. After a longer break the link is reset first, because a
+        //    stale link can hang for up to 15 s before it fails.
+        function onAppBackground() {
+            hiddenAt = Date.now();
             if (statusRefreshTimer) {
-				logWarning('Polling is already active on resume.');
-				return;
-			}
-            if (!targetDevice) {
-                logError('Cannot resume polling, no target device selected.');
+                clearTimeout(statusRefreshTimer);
+                statusRefreshTimer = null;
+            }
+            debugLog('App in background: polling paused.');
+        }
+
+        function onAppForeground(source) {
+            if (document.hidden) return;
+            const now = Date.now();
+            // 'visibilitychange' and hubea's 'onResume' both fire on return: handle it once.
+            if (resumeInFlight || now - lastResumeAt < 1500) return;
+            lastResumeAt = now;
+            const awayMs = hiddenAt ? now - hiddenAt : 0;
+            hiddenAt = 0;
+            if (!setupReady || !targetDevice) return;   // still connecting: the startup flow handles it
+            resumeInFlight = true;
+            const mySeq = connectionSeq;
+            debugLog('App resumed (' + source + ') after ' + Math.round(awayMs / 1000) + 's.');
+            const finish = (ok) => {
+                resumeInFlight = false;
+                if (mySeq !== connectionSeq) return;
+                if (ok) logSuccess('Status refreshed after resume.');
+                else logWarning('Refresh after resume failed; regular polling will keep trying.');
+                startPolling();
+            };
+            const freshLink = () => whenIdle(OP_MAX_AGE_MS, () => resetLink(() => refreshStatusSilent((ok) => finish(ok))));
+            if (awayMs > LINK_STALE_MS && targetDevice.inCommunication && targetDevice.inCommunication()) {
+                debugLog('Long break: starting a fresh Bluetooth link...');
+                freshLink();
+            } else {
+                whenIdle(OP_MAX_AGE_MS, () => refreshStatusSilent((ok) => {
+                    if (ok) { finish(true); return; }
+                    logWarning('Refresh after resume failed; resetting the link and retrying...');
+                    freshLink();
+                }, 8000));
+            }
+        }
+
+        // Calls cb once no Bluetooth operation is running (or after timeoutMs at most).
+        function whenIdle(timeoutMs, cb) {
+            const start = Date.now();
+            (function check() {
+                if (!isBusy() || Date.now() - start >= timeoutMs) { cb(); return; }
+                setTimeout(check, 200);
+            })();
+        }
+
+        // Closes the current Bluetooth link so the next operation opens a fresh one (max 3 s wait).
+        function resetLink(cb) {
+            const device = targetDevice;
+            let done = false;
+            let cap = null;
+            const finish = () => {
+                if (done) return;
+                done = true;
+                if (cap) clearTimeout(cap);
+                if (cb) cb();
+            };
+            if (!device || typeof device.stopCommunication !== 'function' ||
+                (device.inCommunication && !device.inCommunication())) {
+                finish();
                 return;
             }
-            logSuccess('Running initial poll on resume...');
-            refreshStatusSilent(() => startPolling());
+            debugLog('Resetting Bluetooth link...');
+            cap = setTimeout(() => { logWarning('Link reset is slow; continuing anyway.'); finish(); }, 3000);
+            try {
+                device.stopCommunication(finish, finish);
+            } catch (e) {
+                finish();
+            }
         }
 		window.addEventListener('pagehide', pauseAppConnections);
 		
@@ -1357,6 +1572,8 @@
         }
 
         function setupControlListeners() {
+            if (controlListenersAttached) return;   // attach once (avoids duplicate commands)
+            controlListenersAttached = true;
             debugLog('Setting up control event listeners...');
             
             ui.powerToggle.addEventListener('change', function(e) {
@@ -1391,95 +1608,170 @@
         }
 
         function sendCommand(params) {
-			if (!targetDevice) { logError('No device'); return; }
-			
-			pendingParams = { ...pendingParams, ...params };
-			updateUIOptimistic(pendingParams);
+            if (!targetDevice) { logError('No device'); return; }
 
-			if (commandTimeout) clearTimeout(commandTimeout);
-			
-			commandTimeout = setTimeout(() => {
-				const finalParams = { ...pendingParams };
-				pendingParams = {};
-				
-				if (targetDevice.inCommunication && !targetDevice.inCommunication()) {
-					logWarning('Comm inactive, reconnecting...');
-					targetDevice.startCommunication( 
-						() => setTimeout(() => actualSendCommand(finalParams), 500), 
-						(error) => logError('Reconnect failed')
-					);
-				} else {
-					actualSendCommand(finalParams);
-				}
-			}, 0);
-		}
+            pendingParams = { ...pendingParams, ...params };
+            updateUIOptimistic(pendingParams);
 
-        function actualSendCommand(params) {
+            if (commandTimeout) clearTimeout(commandTimeout);
+
+            commandTimeout = setTimeout(() => {
+                commandTimeout = null;
+                const finalParams = { ...pendingParams };
+                pendingParams = {};
+                // No separate reconnect step: setStatus() opens the Bluetooth link with the saved key by
+                // itself. (The old code connected first, then waited another 500 ms before sending.)
+                commandsInFlight++;
+                let released = false;
+                const release = () => {
+                    if (released) return;
+                    released = true;
+                    commandsInFlight = Math.max(0, commandsInFlight - 1);
+                };
+                actualSendCommand(finalParams, release, 0, 0);
+            }, 0);
+        }
+
+        function actualSendCommand(params, release, waitTicks, busyRetries) {
+            const device = targetDevice;
+            if (!device) { release(); return; }
+            // A status read is running: wait for it instead of being rejected as "busy".
+            // (A normal read takes well under a second; this gives up waiting after ~18 s.)
+            if (isBusy() && waitTicks < 150) {
+                setTimeout(() => actualSendCommand(params, release, waitTicks + 1, busyRetries), 120);
+                return;
+            }
             debugLog('▶▶▶ SENDING: ' + JSON.stringify(params) + ' ▶▶▶');
-			updateUIOptimistic(params);
+            updateUIOptimistic(params);
             const startTime = Date.now();
-            const commandTimeout = setTimeout(() => {
+            const opId = beginOp();
+            let settled = false;
+            let cmdTimer = null;
+            const settle = () => {
+                endOp(opId);
+                if (settled) return false;
+                settled = true;
+                if (cmdTimer) clearTimeout(cmdTimer);
+                return true;
+            };
+            cmdTimer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
                 logError('⏱️ Command timeout');
                 showError('Command timeout');
+                release();
+                refreshStatusSilent();
             }, 15000);
             try {
-                targetDevice.setStatus(params, function(status) { // <-- Check for 'status'
-                    clearTimeout(commandTimeout);
+                device.setStatus(params, function() {
+                    const first = settle();
                     logSuccess('✅ Command CONFIRMED! (' + (Date.now() - startTime) + 'ms)');
-                    
-                    if (status) {
-                        logSuccess('Command response included new state.');
-                        updateUI(status); // Update UI with the state we just received
-                        updateSettingsUI(status);
-                    } else {
-                        // Fallback: device didn't return state, so we must refresh
-                        logWarning('Command response empty, scheduling refresh.');
-                        setTimeout(refreshStatusSilent, 1500);
-                    }
-
+                    if (first) release();
+                    // setStatus() doesn't return the new state, so read it back to confirm the UI.
+                    // (The device already acknowledged the change, so 0.5 s is plenty; it was 1.5 s.)
+                    setTimeout(() => refreshStatusSilent(), 500);
                 }, function(error) {
-                    clearTimeout(commandTimeout);
-                    logWarning('Command rejected (device busy): ' + JSON.stringify(error));
-                } );
+                    if (!settle()) return;
+                    const busyCode = (typeof Guardian !== 'undefined' && Guardian.ErrorTypes &&
+                                      Guardian.ErrorTypes.CONNECTION_BUSY) || BUSY_ERROR;
+                    const code = Array.isArray(error) ? error[0] : error;
+                    if (code === busyCode && busyRetries < 8) {
+                        // Used to be silently dropped; now it waits a moment and tries again.
+                        logWarning('Device busy, retrying command...');
+                        setTimeout(() => actualSendCommand(params, release, 0, busyRetries + 1), 300);
+                        return;
+                    }
+                    logWarning('Command failed: ' + JSON.stringify(error));
+                    release();
+                    refreshStatusSilent();   // put the controls back to the purifier's real state
+                });
             } catch (e) {
-                clearTimeout(commandTimeout);
+                settle();
+                release();
                 logError('Exception: ' + e.message);
                 showError('Exception: ' + e.message);
             }
         }
 
-        function startPolling() {
-			if (statusRefreshTimer) clearTimeout(statusRefreshTimer);
-			
-			statusRefreshTimer = setTimeout(() => {
-				if (targetDevice && (!targetDevice.inSession || !targetDevice.inSession())) {
-					refreshStatusSilent(() => startPolling()); // Pass as callback
-				} else {
-					startPolling(); // Skip this tick, try again later
-				}
-			}, REFRESH_INTERVAL);
-		}
+        function beginOp() {
+            const id = ++opSeq;
+            liveOps.set(id, Date.now());
+            return id;
+        }
+        function endOp(id) {
+            liveOps.delete(id);
+        }
+        // True while a Bluetooth operation is running (ours, or a data session inside guardian.js).
+        function isBusy() {
+            const now = Date.now();
+            liveOps.forEach((startedAt, id) => { if (now - startedAt > OP_MAX_AGE_MS) liveOps.delete(id); });
+            return liveOps.size > 0 || !!(targetDevice && targetDevice.inSession && targetDevice.inSession());
+        }
+        // True while a control change hasn't been confirmed yet (polls then leave the controls alone).
+        function commandPending() {
+            return commandsInFlight > 0 || Object.keys(pendingParams).length > 0;
+        }
 
-		// Update refreshStatusSilent to accept a callback
-		function refreshStatusSilent(onComplete) {
-		if (!targetDevice) { 
-			if(onComplete) onComplete(); 
-			return; 
-		}
-		targetDevice.getStatus(
-			(status) => { 
-				if (status) {
-					updateUI(status);
-					updateSettingsUI(status);
-				}
-				if (onComplete) onComplete(); 
-			},
-			(error) => { 
-				logWarning('Silent refresh failed: ' + error);
-				if (onComplete) onComplete(); 
-			}
-		);
-	}
+        function startPolling() {
+            if (statusRefreshTimer) clearTimeout(statusRefreshTimer);
+            statusRefreshTimer = null;
+            // No polling while the app is in the background, or before/while (re)connecting.
+            if (document.hidden || !setupReady || !targetDevice) return;
+
+            statusRefreshTimer = setTimeout(() => {
+                statusRefreshTimer = null;
+                if (document.hidden) return;
+                if (isBusy() || commandPending()) {
+                    startPolling(); // Skip this tick, try again later
+                } else {
+                    refreshStatusSilent(() => startPolling());
+                }
+            }, REFRESH_INTERVAL);
+        }
+
+        // Reads the purifier's state and updates the screen.
+        // onComplete(ok, error, status) is called exactly once, after timeoutMs at the latest, so the
+        // polling loop can't die if a native callback never comes back.
+        function refreshStatusSilent(onComplete, timeoutMs = 20000) {
+            const done = (typeof onComplete === 'function') ? onComplete : function() {};
+            const device = targetDevice;
+            if (!device) { done(false, 'no-device', null); return; }
+            const opId = beginOp();
+            let settled = false;
+            let guard = null;
+            const settle = (ok, error, status) => {
+                if (settled) return;
+                settled = true;
+                if (guard) clearTimeout(guard);
+                done(ok, error, status);
+            };
+            guard = setTimeout(() => {
+                logWarning('Status read is taking too long; moving on.');
+                settle(false, 'timeout', null);
+            }, timeoutMs);
+            try {
+                device.getStatus(
+                    (status) => {
+                        endOp(opId);
+                        // Applied even if it arrives late: it's still the purifier's real state.
+                        if (status && device === targetDevice) {
+                            if (!commandPending()) updateUI(status);   // don't undo a tap in progress
+                            updateSettingsUI(status);
+                        }
+                        settle(true, null, status);
+                    },
+                    (error) => {
+                        endOp(opId);
+                        logWarning('Silent refresh failed: ' + error);
+                        settle(false, error, null);
+                    }
+                );
+            } catch (e) {
+                endOp(opId);
+                logWarning('Silent refresh exception: ' + e.message);
+                settle(false, 'exception', null);
+            }
+        }
         
         function updateUIOptimistic(params) {
             debugLog('Optimistic UI update...');
@@ -1543,11 +1835,11 @@
         }
 
         function updateAirQuality(value) {
-            ui.particulateValue.textContent = value;
-            ui.airQualityBanner.classList.remove('good', 'moderate', 'unhealthy');
-            
+            const valueText = String(value);
+            if (ui.particulateValue.textContent !== valueText) ui.particulateValue.textContent = valueText;
+
             let imageSrc, bannerClass, bannerText;
-            
+
             if (value <= 100) {
                 bannerClass = 'good';
                 bannerText = 'GOOD';
@@ -1561,24 +1853,22 @@
                 bannerText = 'UNHEALTHY';
                 imageSrc = '../img/control-head-led-re.png';
             }
-            
-            ui.airQualityBanner.classList.add(bannerClass);
-            ui.airQualityBanner.textContent = bannerText;
-            ui.deviceImage.src = imageSrc;
+
+            // Only touch the page when something actually changed (this runs on every poll).
+            if (!ui.airQualityBanner.classList.contains(bannerClass)) {
+                ui.airQualityBanner.classList.remove('good', 'moderate', 'unhealthy');
+                ui.airQualityBanner.classList.add(bannerClass);
+            }
+            if (ui.airQualityBanner.textContent !== bannerText) ui.airQualityBanner.textContent = bannerText;
+            if (ui.deviceImage.getAttribute('src') !== imageSrc) ui.deviceImage.setAttribute('src', imageSrc);
         }
 
         function updateSpeedDisplay(mode, speed) {
             const speedBars = ui.speedBars.children;
-            if (mode === 'auto') {
-                ui.speedIcon.src = '../img/control-head-speed_auto.png';
-                for (let i = 0; i < speedBars.length; i++) {
-                    speedBars[i].classList.add('active');
-                }
-            } else {
-                ui.speedIcon.src = '../img/control-head-speed.png';
-                for (let i = 0; i < speedBars.length; i++) {
-                    speedBars[i].classList.toggle('active', i < speed);
-                }
+            const icon = (mode === 'auto') ? '../img/control-head-speed_auto.png' : '../img/control-head-speed.png';
+            if (ui.speedIcon.getAttribute('src') !== icon) ui.speedIcon.setAttribute('src', icon);
+            for (let i = 0; i < speedBars.length; i++) {
+                speedBars[i].classList.toggle('active', mode === 'auto' ? true : i < speed);
             }
         }
 
@@ -1678,58 +1968,67 @@
                 'control-timer.jpg': 'control-timer_dark.jpg',
                 'control-uv.jpg': 'control-uv_dark.jpg'
             };
-            
+
             const amoledIconMappings = {
                 'control-power.jpg': 'control-power_black.jpg',
                 'control-speed.jpg': 'control-speed_black.jpg',
                 'control-timer.jpg': 'control-timer_black.jpg',
                 'control-uv.jpg': 'control-uv_black.jpg'
             };
-            
+
             document.querySelectorAll('.control-icon img').forEach(img => {
-                const currentSrc = img.src;
+                const currentSrc = img.getAttribute('src') || '';
                 const filename = currentSrc.split('/').pop();
-                let baseFilename = filename.replace('_dark.jpg', '.jpg').replace('_black.jpg', '.jpg');
-                
-                if (theme === 'dark') {
-                    const darkVersion = darkIconMappings[baseFilename];
-                    if (darkVersion) img.src = currentSrc.replace(filename, darkVersion);
-                } else if (theme === 'amoled') {
-                    const blackVersion = amoledIconMappings[baseFilename];
-                    if (blackVersion) img.src = currentSrc.replace(filename, blackVersion);
-                } else {
-                    img.src = currentSrc.replace(filename, baseFilename);
+                const baseFilename = filename.replace('_dark.jpg', '.jpg').replace('_black.jpg', '.jpg');
+                let wanted = baseFilename;
+                if (theme === 'dark' && darkIconMappings[baseFilename]) wanted = darkIconMappings[baseFilename];
+                else if (theme === 'amoled' && amoledIconMappings[baseFilename]) wanted = amoledIconMappings[baseFilename];
+                // Only change the image if it's actually different (avoids reloading the same file).
+                if (wanted !== filename) {
+                    img.setAttribute('src', currentSrc.slice(0, currentSrc.length - filename.length) + wanted);
                 }
             });
         }
 
-        function applySavedSettings() {
-            const logVisible = localStorage.getItem('logVisible') !== 'false';
-		ui.logToggle.checked = logVisible;
-		// Toggle visibility for both sets of log elements
-		ui.debugInfo.classList.toggle('console-hidden', !logVisible);
-		ui.copyLogBtn.classList.toggle('console-hidden', !logVisible);
-		ui.debugInfoSettings.classList.toggle('console-hidden', !logVisible);
-		ui.copyLogBtnSettings.classList.toggle('console-hidden', !logVisible);
-            
-            // Theme
-            const darkMode = localStorage.getItem('darkMode') === 'true';
-            const amoledMode = localStorage.getItem('amoledMode') === 'true';
-            
-            if (amoledMode) {
-                document.body.classList.add('amoled-mode');
-                ui.amoledModeToggle.checked = true;
-                updateIconsForTheme('amoled');
-            } else if (darkMode) {
-                document.body.classList.add('dark-mode');
-                ui.darkModeToggle.checked = true;
-                updateIconsForTheme('dark');
+        // Theme helpers. Same rule as the anti-flash script in <head>:
+        // AMOLED if amoledMode is 'true', dark if darkMode is 'true', otherwise light (the original default).
+        const THEME_BG = { amoled: '#000000', dark: '#1a1a1a', light: '#f5f5f5' };
+
+        function currentSavedTheme() {
+            try {
+                if (localStorage.getItem('amoledMode') === 'true') return 'amoled';
+                return localStorage.getItem('darkMode') === 'true' ? 'dark' : 'light';
+            } catch (e) {
+                return 'light';
             }
-            
+        }
+
+        function applyTheme(theme) {
+            if (!THEME_BG[theme]) theme = 'light';
+            const root = document.documentElement;
+            document.body.classList.toggle('dark-mode', theme === 'dark');
+            document.body.classList.toggle('amoled-mode', theme === 'amoled');
+            // Keep the <html> early-theme attribute in sync (its CSS rules outrank the body classes).
+            root.setAttribute('data-early-theme', theme);
+            root.style.background = THEME_BG[theme];
+            if (ui.darkModeToggle) ui.darkModeToggle.checked = (theme === 'dark');
+            if (ui.amoledModeToggle) ui.amoledModeToggle.checked = (theme === 'amoled');
+            updateIconsForTheme(theme);
+        }
+
+        function applySavedSettings() {
+            const showLog = localStorage.getItem('logVisible') !== 'false';
+            ui.logToggle.checked = showLog;
+            setLogVisibility(showLog);
+
+            // Theme: the <head> script already painted the right background; this adds the classes + icons.
+            applyTheme(currentSavedTheme());
+
             // Polling rate
             const savedPollingRate = localStorage.getItem('pollingRate');
-            if (savedPollingRate) {
-                REFRESH_INTERVAL = parseInt(savedPollingRate);
+            const savedRate = parseInt(savedPollingRate, 10);
+            if (savedRate >= 1000) {   // ignore a missing/garbled value (NaN would mean non-stop polling)
+                REFRESH_INTERVAL = savedRate;
                 ui.pollingRateSelect.value = savedPollingRate;
                 debugLog('Restored polling rate: ' + (REFRESH_INTERVAL / 1000) + ' seconds');
             }
