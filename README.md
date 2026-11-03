@@ -1,5 +1,10 @@
 ## A fully functional replacement to the GermGuardian iOS app for controlling your air purifier via bluetooth (BLE).
 
+11/3/2026 Note: GermGuardian is now available on Home Assistant via my custom repo utilizing HACS: https://github.com/NicholasBly/ha-germguardian/
+CDAP4500BCA and CDAP5500BCA models supported including pairing. Full functionality!
+
+Also: Web BLE also supported: Bluefy on iOS or Chrome/Brave on Android. Download the html from here and host it on your website: https://github.com/NicholasBly/GermGuardianBLE/discussions/1
+
 <!--<img width="150" height="327" alt="IMG_5295" src="https://github.com/user-attachments/assets/5c5b381d-5cc8-447d-9f06-12ec1c5f344d" />
 
 <img width="150" height="327" alt="IMG_5293" src="https://github.com/user-attachments/assets/c06d6461-cd4c-4aba-9c0e-3ac511de8e0f" />-->
